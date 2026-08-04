@@ -516,6 +516,71 @@ document.getElementById('usuarios-overlay').addEventListener('click',function(e)
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeUsuarios(); });
 document.getElementById('login-user').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('login-pass').focus(); });
 
+
+// ---- AUTO UPDATE ----
+let _updateCheckInterval=null;
+let _latestSha=null;
+
+async function checkForUpdates(repo, builtSha){
+  try{
+    const storedSha=localStorage.getItem('dalum-sha-'+repo)||builtSha;
+    const r=await fetch(`https://api.github.com/repos/DAluminium/${repo}/commits/main`,{
+      headers:{'Accept':'application/vnd.github.v3+json'},cache:'no-store'
+    });
+    if(!r.ok) return;
+    const d=await r.json();
+    const latestSha=d.sha?.slice(0,12);
+    if(!latestSha) return;
+    // Sempre atualizar o SHA armazenado para o mais recente
+    if(latestSha!==storedSha){
+      _latestSha=latestSha;
+      showUpdateBanner();
+    }
+  }catch(e){}
+}
+
+function showUpdateBanner(){
+  if(document.getElementById('update-banner')) return;
+  const b=document.createElement('div');
+  b.id='update-banner';
+  b.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span>🔄 Nova versão disponível</span><div style="display:flex;gap:6px"><button id="update-btn" onclick="iniciarAtualizacao()" style="background:white;color:var(--teal-dark);border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Atualizar</button><button onclick="this.parentElement.remove()" style="background:rgba(255,255,255,.2);color:white;border:none;border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer">✕</button></div></div><div id="update-progress-bar"><div id="update-progress-fill"></div></div><div id="update-progress-pct"></div>`;
+  document.body.appendChild(b);
+}
+
+function iniciarAtualizacao(){
+  const btn=document.getElementById('update-btn');
+  const bar=document.getElementById('update-progress-bar');
+  const fill=document.getElementById('update-progress-fill');
+  const pct=document.getElementById('update-progress-pct');
+  btn.disabled=true; btn.textContent='Atualizando...';
+  bar.style.display='block'; pct.style.display='block';
+  let p=0;
+  const etapas=[{ate:30,v:80},{ate:60,v:200},{ate:85,v:300},{ate:95,v:500},{ate:100,v:150}];
+  let ei=0;
+  const av=()=>{
+    if(p>=etapas[ei].ate){ ei++; }
+    if(ei>=etapas.length){
+      fill.style.width='100%';
+      pct.textContent='✅ Concluído! Recarregando...';
+      // Salvar novo SHA antes de recarregar para não mostrar banner novamente
+      if(_latestSha) localStorage.setItem('dalum-sha-'+_currentRepo, _latestSha);
+      setTimeout(()=>location.reload(),600);
+      return;
+    }
+    p=Math.min(p+1,etapas[ei].ate);
+    fill.style.width=p+'%'; pct.textContent=`Baixando atualização... ${p}%`;
+    setTimeout(av,etapas[ei]?.v||150);
+  };
+  av();
+}
+
+
+const _currentRepo='portal';
+function startUpdateCheck(){
+  if(_updateCheckInterval) return;
+  _updateCheckInterval=setInterval(()=>checkForUpdates('portal','c8394de057d4'),30000);
+  setTimeout(()=>checkForUpdates('portal','c8394de057d4'),10000);
+}
 // ---- SSO ----
 function setSSOToken(nome,role,modulos){
   localStorage.setItem('dalum-sso',JSON.stringify({nome,role,modulos,ts:Date.now()}));
