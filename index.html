@@ -370,6 +370,14 @@ function showPortal(nome, modulos, isAdmin){
   else document.getElementById('admin-section').style.display='none';
   setSSOToken(nome, isAdmin?'admin':'user', modulos);
   renderModulos(modulos);
+
+  // Se tem só 1 módulo e não é admin, entra direto
+  if(modulos.length===1&&!isAdmin){
+    const URLS={compras:'https://daluminium.github.io/gestaodecompras/',financeiro:'https://daluminium.github.io/financeiro/'};
+    const TITULOS={compras:'Gestão de Compras',financeiro:'Financeiro'};
+    const m=modulos[0];
+    if(URLS[m]) setTimeout(()=>abrirModulo(URLS[m],TITULOS[m]),300);
+  }
 }
 
 // ---- SSO — salva token para login automático nos sistemas ----
