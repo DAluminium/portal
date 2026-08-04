@@ -113,10 +113,6 @@ svg.icon{width:13px;height:13px;vertical-align:middle;fill:none;stroke:currentCo
 
 /* UPDATE */
 @keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
-#update-banner{position:fixed;bottom:20px;right:20px;background:var(--teal-dark);color:white;padding:14px 18px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.25);font-size:13px;font-family:inherit;z-index:9999;animation:slideIn .3s ease;min-width:260px}
-#update-progress-bar{height:6px;background:rgba(255,255,255,.2);border-radius:3px;margin-top:10px;overflow:hidden;display:none}
-#update-progress-fill{height:100%;width:0%;background:white;border-radius:3px;transition:width .1s linear}
-#update-progress-pct{font-size:11px;color:rgba(255,255,255,.8);margin-top:4px;display:none}
 </style>
 </head>
 <body>
@@ -617,51 +613,6 @@ window.addEventListener('message',function(e){
   }
 });
 
-// ---- AUTO UPDATE ----
-let _updateCheckInterval=null;
-const PORTAL_SHA='4d224ca04045';
-async function checkForUpdates(){
-  try{
-    const r=await fetch('https://api.github.com/repos/DAluminium/portal/commits/main',{
-      headers:{'Accept':'application/vnd.github.v3+json'},cache:'no-store'
-    });
-    if(!r.ok) return;
-    const d=await r.json();
-    if(d.sha?.slice(0,12)!==PORTAL_SHA) showUpdateBanner();
-  }catch(e){}
-}
-function showUpdateBanner(){
-  if(document.getElementById('update-banner')) return;
-  const b=document.createElement('div');
-  b.id='update-banner';
-  b.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span>🔄 Nova versão disponível</span><div style="display:flex;gap:6px"><button id="update-btn" onclick="iniciarAtualizacao()" style="background:white;color:var(--teal-dark);border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Atualizar</button><button onclick="this.parentElement.remove()" style="background:rgba(255,255,255,.2);color:white;border:none;border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer">✕</button></div></div><div id="update-progress-bar"><div id="update-progress-fill"></div></div><div id="update-progress-pct"></div>`;
-  document.body.appendChild(b);
-}
-function iniciarAtualizacao(){
-  const btn=document.getElementById('update-btn');
-  const bar=document.getElementById('update-progress-bar');
-  const fill=document.getElementById('update-progress-fill');
-  const pct=document.getElementById('update-progress-pct');
-  btn.disabled=true; btn.textContent='Atualizando...';
-  bar.style.display='block'; pct.style.display='block';
-  let p=0;
-  const etapas=[{ate:30,v:80},{ate:60,v:200},{ate:85,v:300},{ate:95,v:500},{ate:100,v:150}];
-  let ei=0;
-  const av=()=>{
-    if(p>=etapas[ei].ate){ ei++; }
-    if(ei>=etapas.length){ fill.style.width='100%'; pct.textContent='✅ Concluído! Recarregando...'; setTimeout(()=>location.reload(),600); return; }
-    p=Math.min(p+1,etapas[ei].ate);
-    fill.style.width=p+'%'; pct.textContent=`Baixando atualização... ${p}%`;
-    setTimeout(av,etapas[ei]?.v||150);
-  };
-  av();
-}
-function startUpdateCheck(){
-  if(_updateCheckInterval) return;
-  _updateCheckInterval=setInterval(checkForUpdates,30000);
-  setTimeout(checkForUpdates,10000);
-}
-
 if(sessionStorage.getItem('portal-logged')==='true'){
   const nome=sessionStorage.getItem('portal-user')||'';
   const role=sessionStorage.getItem('portal-role')||'';
@@ -669,10 +620,8 @@ if(sessionStorage.getItem('portal-logged')==='true'){
   document.getElementById('login-screen').classList.remove('active');
   showPortal(nome, modulos, role==='admin');
   loadPortalData();
-  startUpdateCheck();
 } else {
   setTimeout(()=>document.getElementById('login-user').focus(),300);
-  startUpdateCheck();
 }
 </script>
 </body>
