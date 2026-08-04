@@ -96,6 +96,15 @@ input:focus,select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 
 .act-edit:hover{border-color:var(--teal);color:var(--teal-dark);background:var(--teal-light)}
 svg.icon{width:13px;height:13px;vertical-align:middle;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
+/* IFRAME */
+.frame-container{display:none;position:fixed;inset:0;z-index:100;flex-direction:column}
+.frame-container.active{display:flex}
+.frame-topbar{background:var(--teal-dark);color:white;padding:0 1.2rem;display:flex;align-items:center;gap:12px;height:44px;flex-shrink:0}
+.frame-back{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:white;padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;font-weight:500}
+.frame-back:hover{background:rgba(255,255,255,.3)}
+.frame-title{font-size:13px;font-weight:600;opacity:.9}
+.frame-iframe{flex:1;border:none;width:100%;height:100%}
+
 .modulo-check{display:flex;gap:8px;align-items:center;margin-top:4px}
 .modulo-check label{font-size:12px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--gray-6);cursor:pointer;display:flex;align-items:center;gap:5px}
 .modulo-check input{width:14px;height:14px;cursor:pointer}
@@ -197,6 +206,18 @@ svg.icon{width:13px;height:13px;vertical-align:middle;fill:none;stroke:currentCo
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeUsuarios()">Fechar</button></div>
   </div>
+</div>
+
+<!-- IFRAME CONTAINER -->
+<div class="frame-container" id="frame-container">
+  <div class="frame-topbar">
+    <button class="frame-back" onclick="voltarPortal()">
+      <svg style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Voltar ao Portal
+    </button>
+    <span class="frame-title" id="frame-title"></span>
+  </div>
+  <iframe class="frame-iframe" id="frame-iframe" src="about:blank" allow="notifications"></iframe>
 </div>
 
 <script>
@@ -342,11 +363,32 @@ function doLogout(){
 function showPortal(nome, modulos, isAdmin){
   document.getElementById('login-screen').classList.remove('active');
   document.getElementById('portal').classList.add('active');
+  document.getElementById('portal').style.display='block';
   document.getElementById('topbar-nome').textContent=nome;
   document.getElementById('greeting-nome').textContent=nome.split(' ')[0];
   if(isAdmin) document.getElementById('admin-section').style.display='block';
   else document.getElementById('admin-section').style.display='none';
+  setSSOToken(nome, isAdmin?'admin':'user', modulos);
   renderModulos(modulos);
+}
+
+// ---- SSO — salva token para login automático nos sistemas ----
+function setSSOToken(nome, role, modulos){
+  const token={nome,role,modulos,ts:Date.now()};
+  localStorage.setItem('dalum-sso',JSON.stringify(token));
+}
+
+function voltarPortal(){
+  document.getElementById('frame-container').classList.remove('active');
+  document.getElementById('frame-iframe').src='about:blank';
+  document.getElementById('portal').style.display='block';
+}
+
+function abrirModulo(url, titulo){
+  document.getElementById('portal').style.display='none';
+  document.getElementById('frame-title').textContent=titulo;
+  document.getElementById('frame-iframe').src=url;
+  document.getElementById('frame-container').classList.add('active');
 }
 
 function renderModulos(modulos){
@@ -375,13 +417,13 @@ function renderModulos(modulos){
   container.innerHTML=modulos.map(m=>{
     const mod=MODULOS[m];
     if(!mod) return '';
-    return`<a href="${mod.url}" target="_blank" class="modulo-card ${mod.cls}">
+    return`<div class="modulo-card ${mod.cls}" onclick="abrirModulo('${mod.url}','${mod.title}')">
       <span class="modulo-badge ${mod.badge}">${mod.badgeText}</span>
       <div class="modulo-icon">${mod.icon}</div>
       <div class="modulo-title">${mod.title}</div>
       <div class="modulo-desc">${mod.desc}</div>
       <div class="modulo-arrow">Acessar →</div>
-    </a>`;
+    </div>`;
   }).join('');
 }
 
@@ -491,6 +533,11 @@ function trocarSenhaUser(found){
 }
 
 // ---- INIT ----
+// Listen for back button from iframe
+window.addEventListener('message',function(e){
+  if(e.data==='voltarPortal') voltarPortal();
+});
+
 document.getElementById('usuarios-overlay').addEventListener('click',function(e){ if(e.target===this) closeUsuarios(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeUsuarios(); });
 document.getElementById('login-user').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('login-pass').focus(); });
