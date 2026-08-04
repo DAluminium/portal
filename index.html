@@ -110,6 +110,8 @@ svg.icon{width:13px;height:13px;vertical-align:middle;fill:none;stroke:currentCo
 .modulo-check input{width:14px;height:14px;cursor:pointer}
 
 @media(max-width:480px){.form-grid{grid-template-columns:1fr}.form-group.span2{grid-column:1}}
+
+@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
 </style>
 </head>
 <body>
@@ -322,7 +324,7 @@ async function doLogin(){
   }
 
   // Check regular users
-  await loadPortalData();
+  await loadPortalData(); startUpdateCheck();
   const users=portalData.usuarios;
   let found=null;
   for(const u of users){
@@ -384,6 +386,47 @@ function showPortal(nome, modulos, isAdmin){
   }
 }
 
+
+// ---- AUTO UPDATE ----
+const REPO_OWNER='DAluminium';
+let _updateCheckInterval=null;
+
+async function checkForUpdates(repo, currentSha){
+  try{
+    const r=await fetch(`https://api.github.com/repos/${REPO_OWNER}/${repo}/commits/main`,{
+      headers:{'Accept':'application/vnd.github.v3+json'},
+      cache:'no-store'
+    });
+    if(!r.ok) return;
+    const d=await r.json();
+    const latestSha=d.sha?.slice(0,12);
+    if(latestSha&&latestSha!==currentSha){
+      console.log('Nova versão detectada:', latestSha);
+      showUpdateBanner();
+    }
+  }catch(e){}
+}
+
+function showUpdateBanner(){
+  // Evitar mostrar múltiplas vezes
+  if(document.getElementById('update-banner')) return;
+  const banner=document.createElement('div');
+  banner.id='update-banner';
+  banner.style.cssText='position:fixed;bottom:20px;right:20px;background:var(--teal-dark);color:white;padding:12px 18px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.25);font-size:13px;font-family:inherit;display:flex;align-items:center;gap:12px;z-index:9999;animation:slideIn .3s ease';
+  banner.innerHTML=`
+    <span>🔄 Nova versão disponível</span>
+    <button onclick="location.reload()" style="background:white;color:var(--teal-dark);border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Atualizar</button>
+    <button onclick="this.parentElement.remove()" style="background:rgba(255,255,255,.2);color:white;border:none;border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer;font-family:inherit">✕</button>
+  `;
+  document.body.appendChild(banner);
+}
+
+
+function startUpdateCheck(){
+  if(_updateCheckInterval) return;
+  _updateCheckInterval=setInterval(()=>checkForUpdates('portal','9d3a4cbb4429'),30000);
+  setTimeout(()=>checkForUpdates('portal','9d3a4cbb4429'),10000);
+}
 // ---- SSO — salva token para login automático nos sistemas ----
 function setSSOToken(nome, role, modulos){
   const token={nome,role,modulos,ts:Date.now()};
@@ -571,9 +614,10 @@ if(sessionStorage.getItem('portal-logged')==='true'){
   const modulos=JSON.parse(sessionStorage.getItem('portal-modulos')||'["compras"]');
   document.getElementById('login-screen').classList.remove('active');
   showPortal(nome, modulos, role==='admin');
-  loadPortalData();
+  loadPortalData(); startUpdateCheck();
 } else {
   setTimeout(()=>document.getElementById('login-user').focus(),300);
+startUpdateCheck();
 }
 </script>
 </body>
