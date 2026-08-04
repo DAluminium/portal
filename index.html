@@ -280,10 +280,14 @@ let portalData={usuarios:[]};
 
 async function loadPortalData(){
   try{
+    // Busca usuários do sistema compras (base principal de usuários)
     const r=await fetch(WORKER_URL,{headers:{'X-Sistema':'compras','Origin':'https://daluminium.github.io'}});
     if(!r.ok) return;
     const d=await r.json();
-    if(d&&d.usuarios) portalData.usuarios=d.usuarios;
+    if(d&&d.usuarios&&d.usuarios.length>0){
+      portalData.usuarios=d.usuarios;
+      renderUserList();
+    }
   }catch(e){ console.warn('Erro ao carregar portal data:', e); }
 }
 
@@ -416,7 +420,7 @@ function renderModulos(modulos){
 }
 
 // ---- USUÁRIOS ----
-function openUsuarios(){ renderUserList(); document.getElementById('usuarios-overlay').classList.add('open'); }
+function openUsuarios(){ document.getElementById('usuarios-overlay').classList.add('open'); loadPortalData(); }
 function closeUsuarios(){ document.getElementById('usuarios-overlay').classList.remove('open'); }
 
 function renderUserList(){
