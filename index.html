@@ -371,12 +371,16 @@ function showPortal(nome, modulos, isAdmin){
   setSSOToken(nome, isAdmin?'admin':'user', modulos);
   renderModulos(modulos);
 
-  // Se tem só 1 módulo e não é admin, entra direto
+  // Se tem só 1 módulo e não é admin, entra direto sem mostrar tela
   if(modulos.length===1&&!isAdmin){
     const URLS={compras:'https://daluminium.github.io/gestaodecompras/',financeiro:'https://daluminium.github.io/financeiro/'};
     const TITULOS={compras:'Gestão de Compras',financeiro:'Financeiro'};
     const m=modulos[0];
-    if(URLS[m]) setTimeout(()=>abrirModulo(URLS[m],TITULOS[m]),300);
+    if(URLS[m]){
+      // Esconde a tela do portal e abre direto
+      document.getElementById('portal').style.display='none';
+      abrirModulo(URLS[m],TITULOS[m]);
+    }
   }
 }
 
