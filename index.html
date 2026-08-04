@@ -544,6 +544,17 @@ function trocarSenhaUser(found){
 // Listen for back button from iframe
 window.addEventListener('message',function(e){
   if(e.data==='voltarPortal') voltarPortal();
+  if(e.data==='logout'){
+    localStorage.removeItem('dalum-sso');
+    ['portal-logged','portal-user','portal-role','portal-modulos','portal-admin-key'].forEach(k=>sessionStorage.removeItem(k));
+    document.getElementById('frame-container').classList.remove('active');
+    document.getElementById('frame-iframe').src='about:blank';
+    document.getElementById('portal').classList.remove('active');
+    document.getElementById('portal').style.display='none';
+    document.getElementById('login-screen').classList.add('active');
+    document.getElementById('login-user').value='';
+    document.getElementById('login-pass').value='';
+  }
 });
 
 document.getElementById('usuarios-overlay').addEventListener('click',function(e){ if(e.target===this) closeUsuarios(); });
