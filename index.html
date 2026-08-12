@@ -461,6 +461,10 @@ async function fazerLoginWorker(user,senha){
   });
   let j=null;
   try{ j=await r.json(); }catch(e){}
+  // Manutencao no login tambem mostra a tela de aviso. Sem isto, quem chegasse
+  // durante uma parada — que e a maioria, porque a pessoa chega para entrar —
+  // via so uma mensagem vermelha de erro, sem entender que era programado.
+  if(r.status===503){ telaManutencao((j&&j.mensagem)||''); const e=new Error('Em manutencao'); e.status=503; throw e; }
   if(!r.ok||!j||!j.token){
     const e=new Error((j&&j.erro)||('Worker '+r.status));
     e.status=r.status;
@@ -507,10 +511,75 @@ function getAdminPass(u){ return(JSON.parse(localStorage.getItem('portal-admin-p
 // ---- DADOS PORTAL (usuários unificados) ----
 let portalData={usuarios:[]};
 
+// ---- SISTEMA EM MANUTENÇÃO ----
+// Ligada por uma variável no Cloudflare, para mexer no banco sem ninguém
+// gravando por cima. Melhor avisar do que a pessoa levar um erro seco no
+// meio de um lançamento e achar que perdeu o trabalho.
+function telaManutencao(msg){
+  const ja=document.getElementById('tela-manutencao');
+  if(ja){
+    const p=ja.querySelector('[data-msg]');
+    if(p&&msg) p.textContent=msg;
+    return;
+  }
+  const d=document.createElement('div');
+  d.id='tela-manutencao';
+  d.style.cssText='position:fixed;inset:0;z-index:300000;background:#fff;display:flex;'+
+    'align-items:center;justify-content:center;padding:24px;'+
+    'font-family:system-ui,-apple-system,"Segoe UI",sans-serif';
+  d.innerHTML='<div style="max-width:460px;text-align:center">'+
+    '<div style="font-size:46px;line-height:1;margin-bottom:16px">&#128736;</div>'+
+    '<h1 style="font-size:20px;margin:0 0 12px;color:#1f2937;font-weight:700">'+
+      'Sistema em manutenção</h1>'+
+    '<p data-msg style="font-size:14.5px;line-height:1.65;color:#4b5563;margin:0 0 10px">'+
+      (msg||'Estamos ajustando o sistema. Volta já.')+'</p>'+
+    '<p style="font-size:13.5px;line-height:1.65;color:#6b7280;margin:0 0 22px">'+
+      'Seus lançamentos estão guardados. Nada foi perdido — só não dá para '+
+      'gravar durante estes minutos.</p>'+
+    '<button onclick="location.reload()" style="background:#0e7490;color:#fff;border:0;'+
+      'padding:11px 20px;border-radius:8px;font-size:14.5px;font-weight:600;'+
+      'cursor:pointer;font-family:inherit">Tentar de novo</button>'+
+    '</div>';
+  document.body.appendChild(d);
+}
+
+// ---- ACESSO NEGADO PELO WORKER ----
+// O Worker recusa os sistemas de teste para quem não é administrador. Sem esta
+// tela o módulo apenas ficava sem dados, e um sistema zerado parece "não tem
+// nada cadastrado" — não "você não tem permissão". Foi exatamente essa
+// confusão que custou meia hora em 11/08/2026.
+function bloqueioAcesso(){
+  if(document.getElementById('bloqueio-acesso')) return;
+  const d=document.createElement('div');
+  d.id='bloqueio-acesso';
+  d.style.cssText='position:fixed;inset:0;z-index:300000;background:#fff;display:flex;'+
+    'align-items:center;justify-content:center;padding:24px;'+
+    'font-family:system-ui,-apple-system,"Segoe UI",sans-serif';
+  d.innerHTML='<div style="max-width:480px;text-align:center">'+
+    '<div style="font-size:46px;line-height:1;margin-bottom:16px">&#128274;</div>'+
+    '<h1 style="font-size:20px;margin:0 0 12px;color:#1f2937;font-weight:700">'+
+      'Este ambiente é só para administradores</h1>'+
+    '<p style="font-size:14.5px;line-height:1.65;color:#4b5563;margin:0 0 10px">'+
+      'Você abriu o <strong>ambiente de teste</strong>, que serve para experimentar '+
+      'mudanças antes de valerem. Ele não é o sistema do dia a dia.</p>'+
+    '<p style="font-size:13.5px;line-height:1.65;color:#6b7280;margin:0 0 22px">'+
+      'Não há nada errado e nada foi perdido. Seus lançamentos estão no sistema '+
+      'de verdade, no endereço abaixo.</p>'+
+    '<a href="https://daluminium.github.io/portal/" target="_top" style="display:inline-block;'+
+      'background:#0e7490;color:#fff;text-decoration:none;padding:11px 20px;'+
+      'border-radius:8px;font-size:14.5px;font-weight:600">Ir para o sistema</a>'+
+    '<p style="font-size:12px;color:#9ca3af;margin:16px 0 0">'+
+      'daluminium.github.io/portal/</p>'+
+    '</div>';
+  document.body.appendChild(d);
+}
+
 async function loadPortalData(){
   try{
     // Busca usuários do sistema compras (base principal de usuários)
     const r=await fetch(WORKER_URL,{headers:cabecalhos('compras')});
+    if(r.status===503){ let m=''; try{ m=(await r.json()).mensagem||''; }catch(e){} telaManutencao(m); return; }
+    if(r.status===403){ bloqueioAcesso(); return; }
     if(!r.ok) return;
     const d=await r.json();
     if(d&&d.usuarios&&d.usuarios.length>0){
@@ -595,10 +664,15 @@ async function doLogin(){
   btn.textContent='Entrar'; btn.disabled=false;
   showPortal(cracha.nome, modulos, isAdmin);
 
+  // Esta leitura tem de acontecer TAMBÉM ao entrar, não só ao recarregar a
+  // página. É ela que descobre uma recusa do Worker — sem isso, quem não
+  // pode estar aqui via o portal normalmente e só batia na parede depois,
+  // ao clicar num módulo ou ao dar F5.
+  await loadPortalData();
+
   // Senha temporária: a troca grava na lista do banco, então precisa do
   // registro de lá. O crachá sozinho não serve para isso.
   if(cracha.tempPass){
-    await loadPortalData();
     const u=portalData.usuarios.find(x=>String(x.username||'').toLowerCase()===String(cracha.username||'').toLowerCase());
     if(u) setTimeout(()=>trocarSenhaUser(u),500);
   }
@@ -913,6 +987,7 @@ function setSSOToken(nome,role,modulos){
   localStorage.setItem('dalum-sso',JSON.stringify({nome,username,role:papel,modulos,ts:Date.now()}));
 }
 function voltarPortal(){
+  try{ sessionStorage.removeItem('portal-modulo-aberto'); }catch(e){}
   document.getElementById('frame-container').classList.remove('active');
   document.getElementById('frame-iframe').src='about:blank';
   document.getElementById('portal').style.display='block';
@@ -930,6 +1005,10 @@ function abrirModulo(url,titulo){
   frame.onload=function(){ load.classList.remove('show'); };
   frame.src=url+(url.includes('?')?'&':'?')+'v='+FRAME_V;
   document.getElementById('frame-container').classList.add('active');
+  // Guarda qual modulo esta aberto. Sem isto, um F5 — que recarrega a pagina
+  // de fora, o portal — devolvia a pessoa para a escolha de modulos e ela
+  // perdia o lugar. E a gente vive pedindo Ctrl+Shift+R.
+  try{ sessionStorage.setItem('portal-modulo-aberto',JSON.stringify({url:url,titulo:titulo})); }catch(e){}
 }
 window.addEventListener('message',function(e){
   if(e.data==='voltarPortal') voltarPortal();
@@ -979,6 +1058,19 @@ if(entrarPeloCracha()){
 } else {
   setTimeout(()=>document.getElementById('login-user').focus(),300);
 }
+
+// Reabre o modulo em que a pessoa estava. Nao reabre se o acesso foi recusado
+// — nesse caso a tela de aviso e que tem de aparecer.
+// Reabre AGORA, sem esperar. Esperar fazia o portal piscar na tela antes de
+// o modulo voltar. Se o acesso for recusado, o aviso cobre tudo de qualquer
+// forma, entao nao ha por que aguardar a resposta do servidor para decidir.
+(function(){
+  if(document.getElementById('bloqueio-acesso')) return;
+  if(sessionStorage.getItem('portal-logged')!=='true') return;
+  let m=null;
+  try{ m=JSON.parse(sessionStorage.getItem('portal-modulo-aberto')||'null'); }catch(e){}
+  if(m&&m.url&&m.titulo) abrirModulo(m.url,m.titulo);
+})();
 </script>
 </body>
 </html>
