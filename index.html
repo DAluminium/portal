@@ -200,19 +200,26 @@ font-size:11.5px;padding:10px 12px;border-radius:6px;margin:8px 0;line-height:1.
     <div class="admin-section" id="admin-section" style="display:none">
       <div class="admin-title">⚙️ Administração</div>
       <div class="admin-cards">
-        <div class="admin-card" onclick="openUsuarios()">
+        <div class="admin-card" id="card-usuarios" onclick="openUsuarios()">
           <svg class="icon" style="width:18px;height:18px" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Gerenciar usuários
+        </div>
+        <!-- No ambiente de teste esta tela dá lugar a um recado: o cadastro de
+             usuários é único e mora em produção. Ver ajustarCadastroDeUsuarios. -->
+        <div class="admin-card" id="card-usuarios-teste" style="display:none;cursor:default;opacity:.8">
+          <svg class="icon" style="width:18px;height:18px" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span style="text-align:left;line-height:1.4">Usuários ficam em produção<br>
+            <span style="font-size:10.5px;font-weight:400;opacity:.85">Cadastre em daluminium.github.io/portal/</span></span>
         </div>
         <div class="admin-card" onclick="changeMyPass()">
           <svg class="icon" style="width:18px;height:18px" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           Alterar minha senha
         </div>
-        <div class="admin-card" onclick="openManual()">
+        <div class="admin-card" data-so-admin onclick="openManual()">
           <svg class="icon" style="width:18px;height:18px" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           Manual de emergência
         </div>
-        <div class="admin-card" onclick="openSessoes()">
+        <div class="admin-card" data-so-admin onclick="openSessoes()">
           <svg class="icon" style="width:18px;height:18px" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
           Sessões ativas
         </div>
@@ -577,7 +584,7 @@ function bloqueioAcesso(){
 async function loadPortalData(){
   try{
     // Busca usuários do sistema compras (base principal de usuários)
-    const r=await fetch(WORKER_URL,{headers:cabecalhos('compras')});
+    const r=await fetch(WORKER_URL+'?t='+Date.now(),{cache:'no-store',headers:cabecalhos('compras')});
     if(r.status===503){ let m=''; try{ m=(await r.json()).mensagem||''; }catch(e){} telaManutencao(m); return; }
     if(r.status===403){ bloqueioAcesso(); return; }
     if(!r.ok) return;
@@ -701,8 +708,19 @@ function showPortal(nome, modulos, isAdmin){
   document.getElementById('portal').style.display='block';
   document.getElementById('topbar-nome').textContent=nome;
   document.getElementById('greeting-nome').textContent=nome.split(' ')[0];
-  if(isAdmin) document.getElementById('admin-section').style.display='block';
+  // Gerente também entra aqui: ele cadastra funcionário, só que apenas abaixo
+  // dele. Quem limita o alcance é a hierarquia, não a porta.
+  //
+  // O papel vem de `portal-role`, e não da variável do login: showPortal é
+  // chamada por três caminhos — login, crachá guardado e portal já aberto — e
+  // nos dois últimos aquela variável não existe. Usá-la quebrava a função no
+  // meio, e a tela ficava sem módulo nenhum.
+  const podeAdministrar = isAdmin ||
+    String(sessionStorage.getItem('portal-role')||'').toLowerCase()==='gerente';
+  if(podeAdministrar) document.getElementById('admin-section').style.display='block';
   else document.getElementById('admin-section').style.display='none';
+  ajustarCartoesDeAdmin();
+  ajustarCadastroDeUsuarios();
   setSSOToken(nome, isAdmin?'admin':'user', modulos);
   registrarSessaoPortal(nome, sessionStorage.getItem('portal-admin-key')||nome);
   startSessionCheckPortal();
@@ -746,7 +764,82 @@ function renderModulos(modulos){
 }
 
 // ---- USUÁRIOS ----
-function openUsuarios(){ document.getElementById('usuarios-overlay').classList.add('open'); loadPortalData(); }
+// ---- HIERARQUIA DE QUEM MEXE EM QUEM ----
+// admin > gerente > os demais. Cada um só cadastra e altera quem está ABAIXO
+// dele. Sem isso, um gerente criaria outro gerente e o acesso se multiplicaria
+// sozinho; e pior, poderia trocar a senha de um colega de mesmo nível e entrar
+// no lugar dele.
+const NIVEL={admin:3, gerente:2, compras:1, financeiro:1, consulta:1};
+function nivelDe(role){ return NIVEL[String(role||'').toLowerCase()] || 1; }
+function meuNivel(){ return nivelDe(sessionStorage.getItem('portal-role')||''); }
+function podeMexerEm(u){ return meuNivel() > nivelDe(u && u.role); }
+// Os papéis que EU posso conceder: só os de nível menor que o meu.
+function papeisQuePossoDar(){
+  const meu=meuNivel();
+  return ['gerente','compras','financeiro','consulta'].filter(function(r){ return nivelDe(r)<meu; });
+}
+
+// O formulário só oferece o que a pessoa pode conceder. A trava de verdade
+// fica dentro de addUsuario e editUsuario — esconder opção não é travar.
+function ajustarPapeisDisponiveis(){
+  const sel=document.getElementById('nu-role');
+  if(!sel) return;
+  const rot={gerente:'Gerente',compras:'Compras',financeiro:'Financeiro',consulta:'Consulta'};
+  const podem=papeisQuePossoDar();
+  sel.innerHTML=podem.map(function(r){ return '<option value="'+r+'">'+rot[r]+'</option>'; }).join('');
+}
+
+// O cadastro de usuários é ÚNICO e mora em produção: o login do Worker sempre
+// lê a lista de `compras`, em qualquer ambiente. Mas o portal de teste gravava
+// no registro de teste do Compras, um lugar que ninguém consulta — dava para
+// cadastrar alguém que nunca conseguiria entrar, e sem aviso nenhum.
+// Aconteceu em 13/08/2026.
+//
+// A marca de que este é o ambiente de teste é a própria faixa. O arquivo de
+// produção é montado sem ela, então lá esta troca não acontece e a tela
+// funciona normalmente.
+function ambienteDeTeste(){ return !!document.getElementById('faixa-teste'); }
+// Nem tudo na área de administração é para o gerente. As sessões ativas
+// mostram quem está trabalhando e a que horas, e permitem derrubar a sessão
+// de alguém — inclusive a do admin. O manual de emergência explica como mexer
+// no banco e recuperar o sistema.
+//
+// Esconder o cartão é só a parte visível: as funções conferem o papel também,
+// porque quem souber o nome delas pode chamá-las direto.
+function soAdmin(){ return String(sessionStorage.getItem('portal-role')||'').toLowerCase()==='admin'; }
+function ajustarCartoesDeAdmin(){
+  const eh=soAdmin();
+  document.querySelectorAll('[data-so-admin]').forEach(function(el){
+    el.style.display = eh ? '' : 'none';
+  });
+}
+function recusarSeNaoForAdmin(oque){
+  if(soAdmin()) return false;
+  alert('Isto é só para o administrador.\n\n' + oque);
+  return true;
+}
+
+function ajustarCadastroDeUsuarios(){
+  if(!ambienteDeTeste()) return;
+  const c=document.getElementById('card-usuarios');
+  const t=document.getElementById('card-usuarios-teste');
+  if(c) c.style.display='none';
+  if(t) t.style.display='';
+}
+
+function openUsuarios(){
+  // Esconder o cartão não basta: a trava fica aqui.
+  if(ambienteDeTeste()){
+    alert('O cadastro de usuários é único e fica em produção.\n\n' +
+          'O login sempre consulta a lista de lá, em qualquer ambiente. ' +
+          'Cadastrar por aqui criaria alguém que nunca conseguiria entrar.\n\n' +
+          'Use daluminium.github.io/portal/');
+    return;
+  }
+  document.getElementById('usuarios-overlay').classList.add('open');
+  ajustarPapeisDisponiveis();
+  loadPortalData();
+}
 function closeUsuarios(){ document.getElementById('usuarios-overlay').classList.remove('open'); }
 
 function renderUserList(){
@@ -761,9 +854,10 @@ function renderUserList(){
         <div style="font-size:11px;color:var(--gray-4)">${roleLabel[u.role]||u.role} · Módulos: ${(u.modulos||['compras']).join(', ')} · Senha: ••••••••</div>
       </div>
       <span style="font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;${u.active!==false?'background:var(--green-light);color:var(--green)':'background:var(--gray-2);color:var(--gray-4)'}">${u.active!==false?'Ativo':'Inativo'}</span>
-      <button class="act act-edit" onclick="editUsuario(${i})" title="Editar"><svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+      ${podeMexerEm(u)?`<button class="act act-edit" onclick="editUsuario(${i})" title="Editar"><svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
       <button class="act" onclick="toggleUsuario(${i})" title="${u.active!==false?'Desativar':'Ativar'}">${u.active!==false?'🔒':'🔓'}</button>
-      <button class="act act-del" onclick="removeUsuario(${i})"><svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+      <button class="act act-del" onclick="removeUsuario(${i})"><svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>`
+      :`<span style="font-size:10.5px;color:var(--gray-4);white-space:nowrap" title="Só quem está acima na hierarquia pode alterar">acima de você</span>`}
     </div>`).join('');
 }
 
@@ -780,6 +874,13 @@ async function addUsuario(){
   if(ADMINS.find(a=>a.user===username)){ alert('Usuário reservado para administradores.'); return; }
   if(portalData.usuarios.find(u=>u.username===username)){ alert('Usuário já cadastrado.'); return; }
   if(!modulos.length){ alert('Selecione pelo menos 1 módulo.'); return; }
+  // A trava fica aqui, e nao so na lista de opcoes: sem isto, bastaria
+  // mexer na pagina para criar alguem do mesmo nivel ou acima.
+  if(papeisQuePossoDar().indexOf(role)<0){
+    alert('Você não pode criar um usuário com essa função.\n\n' +
+          'Só dá para cadastrar quem fica abaixo de você.');
+    return;
+  }
   const passHash=await sha256(pass);
   portalData.usuarios.push({name,username,password:passHash,role,modulos,active:true,tempPass:true});
   await savePortalData();
@@ -793,8 +894,21 @@ async function addUsuario(){
 
 async function editUsuario(idx){
   const u=portalData.usuarios[idx];
+  // Não dá para editar quem está no mesmo nível ou acima. Sem isto, um gerente
+  // trocaria a senha de outro gerente e entraria no lugar dele.
+  if(!podeMexerEm(u)){
+    alert('Você não pode editar este usuário.\n\nSó dá para alterar quem fica abaixo de você.');
+    return;
+  }
   const novoNome=prompt('Nome completo:',u.name); if(novoNome===null) return;
-  const novoRole=prompt('Função (compras/gerente/financeiro/consulta):',u.role); if(novoRole===null) return;
+  const opcoes=papeisQuePossoDar().join('/');
+  const novoRole=prompt('Função ('+opcoes+'):',u.role); if(novoRole===null) return;
+  // A função é digitada à mão, então precisa ser conferida: sem isto bastava
+  // escrever "admin" para se promover.
+  if(papeisQuePossoDar().indexOf(String(novoRole).trim().toLowerCase())<0){
+    alert('Função inválida: "'+novoRole+'".\n\nVocê pode usar: '+opcoes+'.');
+    return;
+  }
   const novosMods=prompt('Módulos (compras,financeiro):' ,(u.modulos||['compras']).join(',')); if(novosMods===null) return;
   const novaSenha=prompt('Nova senha (deixe em branco para manter):','');
   portalData.usuarios[idx].name=novoNome.trim()||u.name;
@@ -807,12 +921,22 @@ async function editUsuario(idx){
 }
 
 async function toggleUsuario(idx){
+  if(!podeMexerEm(portalData.usuarios[idx])){
+    alert('Você não pode desativar este usuário.\n\n' +
+          'Só dá para mexer em quem fica abaixo de você.');
+    return;
+  }
   portalData.usuarios[idx].active=portalData.usuarios[idx].active===false?true:false;
   await savePortalData();
   renderUserList();
 }
 
 async function removeUsuario(idx){
+  if(!podeMexerEm(portalData.usuarios[idx])){
+    alert('Você não pode remover este usuário.\n\n' +
+          'Só dá para mexer em quem fica abaixo de você.');
+    return;
+  }
   if(!confirm(`Remover "${portalData.usuarios[idx].name}"?`)) return;
   portalData.usuarios.splice(idx,1);
   await savePortalData();
@@ -861,10 +985,14 @@ document.getElementById('login-user').addEventListener('keydown',e=>{ if(e.key==
 
 // ---- SESSÕES ATIVAS ----
 
-function openManual(){ document.getElementById('manual-overlay').classList.add('open'); }
+function openManual(){
+  if(recusarSeNaoForAdmin('O manual explica como recuperar o sistema e mexer no banco.')) return;
+  document.getElementById('manual-overlay').classList.add('open');
+}
 function closeManual(){ document.getElementById('manual-overlay').classList.remove('open'); }
 
 function openSessoes(){
+  if(recusarSeNaoForAdmin('A lista mostra quem esta trabalhando e permite encerrar a sessao de qualquer pessoa.')) return;
   document.getElementById('sessoes-panel').style.display='block';
   loadSessoes();
 }
