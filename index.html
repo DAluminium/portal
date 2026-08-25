@@ -182,6 +182,9 @@ font-size:11.5px;padding:10px 12px;border-radius:6px;margin:8px 0;line-height:1.
     <div class="topbar-logo">DALUMINIUM <span>Portal</span></div>
     <div class="topbar-user">
       <strong id="topbar-nome"></strong>
+      <button class="btn-sair" id="btn-relato" onclick="abrirRelato()" style="display:none" title="Avisar o administrador sobre um erro ou pedir uma alteração">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Relatar
+      </button>
       <button class="btn-sair" onclick="doLogout()">
         <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sair
       </button>
@@ -194,7 +197,20 @@ font-size:11.5px;padding:10px 12px;border-radius:6px;margin:8px 0;line-height:1.
       <p>Escolha o módulo que deseja acessar</p>
     </div>
 
+    <!-- Lembretes que venceram ou vencem hoje. Aparece para qualquer pessoa,
+         logo na entrada, porque é o único momento em que dá para avisar: o
+         sistema não roda com ninguém dentro. -->
+    <div id="aviso-lembretes" style="display:none;background:#fff4e0;border:1px solid #f0d3a0;
+      border-radius:10px;padding:11px 15px;margin-bottom:14px;font-size:12.5px;color:#7d5a10;
+      cursor:pointer;line-height:1.5" onclick="openLembretes()"></div>
+
     <div class="modulos" id="modulos-container"></div>
+
+    <div style="text-align:center;margin-top:6px">
+      <button class="btn btn-outline" style="font-size:12.5px;padding:7px 16px" onclick="openLembretes()">
+        ⏰ Meus lembretes<span id="card-lembretes-conta"></span>
+      </button>
+    </div>
 
     <!-- ADMIN -->
     <div class="admin-section" id="admin-section" style="display:none">
@@ -229,6 +245,10 @@ font-size:11.5px;padding:10px 12px;border-radius:6px;margin:8px 0;line-height:1.
           <svg class="icon" style="width:18px;height:18px" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
           Sessões ativas
         </div>
+        <div class="admin-card" data-so-admin onclick="openTempoUso()">
+          <svg class="icon" style="width:18px;height:18px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Tempo de uso
+        </div>
       </div>
 
       <!-- SESSÕES ATIVAS -->
@@ -239,11 +259,90 @@ font-size:11.5px;padding:10px 12px;border-radius:6px;margin:8px 0;line-height:1.
         </div>
         <div id="sessoes-lista"><p style="font-size:13px;color:var(--gray-4);text-align:center">Carregando...</p></div>
       </div>
+
+      <!-- TEMPO DE USO -->
+      <div id="tempo-panel" style="display:none;margin-top:1.5rem;background:white;border-radius:12px;padding:1.2rem;box-shadow:var(--shadow)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:13px;font-weight:700">⏱️ Tempo de uso do sistema</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <select id="tempo-periodo" onchange="loadTempoUso()" style="width:auto;font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid var(--gray-2)">
+              <option value="hoje">Hoje</option>
+              <option value="7">Últimos 7 dias</option>
+              <option value="30">Últimos 30 dias</option>
+              <option value="tudo">Tudo o que está guardado</option>
+            </select>
+            <button onclick="loadTempoUso()" class="btn btn-outline" style="font-size:11px;padding:4px 10px">🔄 Atualizar</button>
+            <button onclick="exportTempoUso()" class="btn btn-outline" style="font-size:11px;padding:4px 10px">⬇️ Exportar</button>
+          </div>
+        </div>
+        <div id="tempo-lista"><p style="font-size:13px;color:var(--gray-4);text-align:center">Carregando...</p></div>
+      </div>
     </div>
   </div>
 </div>
 
 <!-- MODAL USUÁRIOS -->
+<!-- MEUS LEMBRETES -->
+<div class="modal-overlay" id="lembretes-overlay">
+  <div class="modal" style="width:min(560px,100%)">
+    <div class="modal-header">
+      <div class="modal-title">⏰ Meus lembretes</div>
+      <button class="btn btn-outline" style="padding:4px 10px;font-size:12px" onclick="closeLembretes()">Fechar</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--teal-light);border-radius:8px;padding:9px 13px;font-size:12px;color:var(--teal-dark);margin-bottom:14px;line-height:1.5">
+        ℹ️ São só seus — ninguém mais vê. O sistema mostra o lembrete <strong>quando você entrar</strong>, no dia marcado e nos dias seguintes, até você dar como resolvido. Ele não envia nada sozinho.
+      </div>
+      <div class="form-grid">
+        <div class="form-group span2"><label>O que você não quer esquecer</label>
+          <input id="lem-texto" type="text" placeholder="Ex: cobrar o vidro da Construtora Silva" onkeydown="if(event.key==='Enter')addLembrete()">
+        </div>
+        <div class="form-group"><label>Lembrar em</label>
+          <input id="lem-data" type="date">
+        </div>
+        <div class="form-group" style="display:flex;align-items:flex-end">
+          <button class="btn btn-teal" style="width:100%" onclick="addLembrete()">Guardar lembrete</button>
+        </div>
+      </div>
+      <div id="lem-lista" style="margin-top:14px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- RELATAR PROBLEMA PARA O ADMIN -->
+<div class="modal-overlay" id="relato-overlay">
+  <div class="modal" style="width:min(520px,100%)">
+    <div class="modal-header">
+      <div class="modal-title">Relatar para o administrador</div>
+      <button class="btn btn-outline" style="padding:4px 10px;font-size:12px" onclick="fecharRelato()">Fechar</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group span2"><label>Do que se trata</label>
+          <select id="rel-tipo">
+            <option value="erro">⚠️ Erro no sistema</option>
+            <option value="alteracao">✏️ Pedido de alteração</option>
+            <option value="duvida">❓ Dúvida</option>
+          </select>
+        </div>
+        <div class="form-group span2"><label>O que aconteceu *</label>
+          <textarea id="rel-texto" rows="4" placeholder="Ex: cliquei em salvar e a janela não fechou"></textarea>
+          <span style="font-size:11px;color:var(--gray-4)">Escreva com suas palavras. O sistema já manda junto o módulo, a tela, o seu nome, a hora e o detalhe técnico do erro.</span>
+        </div>
+        <div class="form-group span2"><label>Print ou foto (opcional)</label>
+          <input id="rel-arquivo" type="file" accept="image/*" onchange="relatoEscolheuImagem(this)">
+          <div style="font-size:11px;color:#777;margin-top:3px">No computador dá para pular isto: tire o print com <strong>Windows + Shift + S</strong> e cole com <strong>Ctrl+V</strong> dentro da conversa. No celular, escolher aqui manda foto e texto juntos.</div>
+          <div id="rel-previa" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fecharRelato()">Cancelar</button>
+      <button class="btn btn-teal" onclick="enviarRelato()">Abrir WhatsApp</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="usuarios-overlay">
   <div class="modal">
     <div class="modal-header">
@@ -270,6 +369,11 @@ font-size:11.5px;padding:10px 12px;border-radius:6px;margin:8px 0;line-height:1.
               <option value="financeiro">Financeiro</option>
               <option value="consulta">Consulta</option>
             </select>
+          </div>
+          <div class="form-group span2">
+            <label>WhatsApp (opcional)</label>
+            <input id="nu-whatsapp" type="text" placeholder="Ex: 69 99999-9999">
+            <span style="font-size:11px;color:var(--gray-4)">Serve para avisar esta pessoa quando uma obra passar para ela. O sistema abre o WhatsApp com a mensagem pronta — quem envia é você.</span>
           </div>
           <div class="form-group span2">
             <label>Acesso aos módulos</label>
@@ -377,7 +481,7 @@ FROM app_backups ORDER BY created_at DESC LIMIT 20;</code>
 
 <div class="man-box">
   <div class="man-h">5. Encerrar a sessão de alguém</div>
-  <p>Em <em>Sessões ativas</em> aparece quem está logado e em qual módulo. O botão <strong>Deslogar</strong> encerra a sessão da pessoa em até 30 segundos.</p>
+  <p>Em <em>Sessões ativas</em> aparece quem está usando o sistema e em qual módulo. O sistema dá sinal de vida a cada 5 minutos; quem fica <strong>1 hora sem mexer</strong> sai da lista sozinho. Bolinha verde é atividade nos últimos 10 minutos; laranja, mais tempo parado. O botão <strong>Deslogar</strong> encerra a sessão da pessoa em até 30 segundos.</p>
 </div>
 
 <div class="man-box">
@@ -732,6 +836,8 @@ function showPortal(nome, modulos, isAdmin){
   ajustarCadastroDeUsuarios();
   setSSOToken(nome, isAdmin?'admin':'user', modulos);
   registrarSessaoPortal(nome, sessionStorage.getItem('portal-admin-key')||nome);
+  carregarAvisaveis();   // quem pode receber relato
+  carregarLembretes();   // o que ficou marcado para hoje
   startSessionCheckPortal();
   renderModulos(modulos);
   // 1 módulo e não admin — entra direto
@@ -940,7 +1046,7 @@ function renderUserList(){
     visiveis.map(({u,i})=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--gray-1);border-radius:8px;border:1px solid var(--gray-2);margin-bottom:6px">
       <div style="flex:1">
         <div style="font-weight:600;font-size:13px">${u.name} <span style="font-size:11px;color:var(--gray-4)">(${u.username})</span></div>
-        <div style="font-size:11px;color:var(--gray-4)">${roleLabel[u.role]||u.role} · Módulos: ${(u.modulos||['compras']).join(', ')} · Senha: ••••••••</div>
+        <div style="font-size:11px;color:var(--gray-4)">${roleLabel[u.role]||u.role} · Módulos: ${(u.modulos||['compras']).join(', ')} · Senha: ••••••••${u.whatsapp?' · 📲 '+u.whatsapp:''}</div>
         ${(souAdmin()&&u.criadoPor)?`<div style="font-size:10.5px;color:${cadastroRecenteDeOutro(u)?'#b9770e':'var(--gray-4)'};margin-top:2px">
           ${cadastroRecenteDeOutro(u)?'⚠️ ':''}cadastrado por <strong>${u.criadoPor}</strong>${u.criadoEm?' em '+fmtDataHora(u.criadoEm):''}</div>`:''}
       </div>
@@ -975,10 +1081,15 @@ async function addUsuario(){
   const passHash=await sha256(pass);
   // Quem cadastrou fica registrado: e por isso que o gerente consegue depois
   // enxergar so os seus. Sem isto nao haveria como saber de quem e cada um.
+  // Guarda so os digitos: o numero e usado para montar o link do WhatsApp, e
+  // parenteses, traco e espaco atrapalham. O 55 do Brasil entra na hora de
+  // montar o link, para nao depender de quem digitou lembrar dele.
+  const whatsapp=document.getElementById('nu-whatsapp').value.replace(/\D/g,'');
   portalData.usuarios.push({name,username,password:passHash,role,modulos,active:true,tempPass:true,
+    whatsapp:whatsapp,
     criadoPor:meuUsuario(), criadoEm:new Date().toISOString()});
   await savePortalData();
-  ['nu-name','nu-username','nu-pass'].forEach(id=>document.getElementById(id).value='');
+  ['nu-name','nu-username','nu-pass','nu-whatsapp'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('nu-mod-compras').checked=true;
   document.getElementById('nu-mod-financeiro').checked=false;
   document.getElementById('nu-mod-fabrica').checked=false;
@@ -1004,8 +1115,10 @@ async function editUsuario(idx){
     return;
   }
   const novosMods=prompt('Módulos (compras,financeiro):' ,(u.modulos||['compras']).join(',')); if(novosMods===null) return;
+  const novoZap=prompt('WhatsApp (só números, em branco para não avisar):',u.whatsapp||''); if(novoZap===null) return;
   const novaSenha=prompt('Nova senha (deixe em branco para manter):','');
   portalData.usuarios[idx].name=novoNome.trim()||u.name;
+  portalData.usuarios[idx].whatsapp=String(novoZap).replace(/\D/g,'');
   portalData.usuarios[idx].role=novoRole.trim();
   portalData.usuarios[idx].modulos=novosMods.split(',').map(m=>m.trim()).filter(m=>['compras','financeiro','fabrica'].includes(m));
   if(novaSenha&&novaSenha.trim().length>=6){ portalData.usuarios[idx].password=await sha256(novaSenha.trim()); portalData.usuarios[idx].tempPass=false; }
@@ -1100,20 +1213,35 @@ async function loadSessoes(){
     });
     if(!r.ok){ lista.innerHTML='<p style="font-size:13px;color:var(--red);text-align:center">Erro ao carregar sessões.</p>'; return; }
     const d=await r.json();
-    const ativas=(d.ativas||[]).filter(s=>Date.now()-s.ts<8*60*60*1000);
+    // Uma hora sem sinal de vida e a pessoa sai da lista. Antes eram 8 horas
+    // contadas do LOGIN, e o carimbo nunca era renovado: quem fechava o
+    // notebook continuava aparecendo como ativo o resto do expediente.
+    // Fecha aqui mesmo quem passou de 1 hora sem sinal, para o tempo de uso
+    // dessas pessoas ficar guardado em vez de simplesmente sumir da tela.
+    if(limparParadas(d)){
+      try{ await fetch(WORKER_SESS,{method:'PATCH',
+        headers:cabecalhos('sessions',{'Content-Type':'application/json'}),
+        body:JSON.stringify({data:d})}); }catch(e){}
+    }
+    const ativas=(d.ativas||[]).filter(s=>Date.now()-s.ts<60*60*1000);
     if(!ativas.length){
       lista.innerHTML='<p style="font-size:13px;color:var(--gray-4);text-align:center">Nenhum usuário ativo no momento.</p>';
       return;
     }
-    const sistemaLabel={compras:'🛒 Gestão de Compras',financeiro:'💰 Financeiro',portal:'🏠 Portal'};
+    ativas.sort((a,b)=>b.ts-a.ts);
+    const sistemaLabel={compras:'🛒 Gestão de Compras',financeiro:'💰 Financeiro',portal:'🏠 Portal',fabrica:'🏭 Fábrica'};
     lista.innerHTML=ativas.map(s=>{
       const minutos=Math.floor((Date.now()-s.ts)/60000);
-      const tempo=minutos<60?minutos+'min atrás':Math.floor(minutos/60)+'h atrás';
+      // O sinal de vida chega a cada 5 minutos, entao ate 10 minutos e "agora".
+      // Verde so quando e verdade — pintar tudo de verde nao dizia nada.
+      const recente=minutos<=10;
+      const tempo=minutos<1?'agora mesmo':(minutos===1?'há 1 minuto':'há '+minutos+' minutos');
       return`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--gray-1);border-radius:8px;border:1px solid var(--gray-2);margin-bottom:6px">
-        <div style="width:8px;height:8px;border-radius:50%;background:#1A7A45;flex-shrink:0"></div>
+        <div title="${recente?'Usando o sistema agora':'Sem atividade há mais de 10 minutos'}" style="width:8px;height:8px;border-radius:50%;background:${recente?'#1A7A45':'#B9770E'};flex-shrink:0"></div>
         <div style="flex:1">
           <div style="font-weight:600;font-size:13px">${s.nome}</div>
-          <div style="font-size:11px;color:var(--gray-4)">${sistemaLabel[s.sistema]||s.sistema} · Logado há ${tempo}</div>
+          <div style="font-size:11px;color:var(--gray-4)">${sistemaLabel[s.sistema]||s.sistema} · Ativo ${tempo}</div>
+          <div style="font-size:11px;color:var(--gray-4)">⏱️ Operando há <strong>${duracaoTexto((Date.now()-(s.inicio||s.ts))/60000)}</strong> · entrou às ${new Date(s.inicio||s.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
         </div>
         <button onclick="forceLogout('${s.sessionId}','${s.nome}')" style="background:var(--red);color:white;border:none;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">Deslogar</button>
       </div>`;
@@ -1166,7 +1294,7 @@ async function removerSessaoPortal(){
     const r=await fetch(WORKER_SESS,{headers:cabecalhos('sessions')});
     if(!r.ok) return;
     const d=await r.json();
-    d.ativas=(d.ativas||[]).filter(s=>s.sessionId!==_sessionId);
+    encerrarNaLista(d,_sessionId,'saiu');
     await fetch(WORKER_SESS,{method:'PATCH',
       headers:cabecalhos('sessions',{'Content-Type':'application/json'}),
       body:JSON.stringify({data:d})});
@@ -1180,14 +1308,575 @@ async function checkForceLogoutPortal(){
     const forced=(d.forceLogout||[]);
     if(forced.includes(_sessionId)){
       d.forceLogout=forced.filter(x=>x!==_sessionId);
-      d.ativas=(d.ativas||[]).filter(x=>x.sessionId!==_sessionId);
+      encerrarNaLista(d,_sessionId,'deslogado');
       await fetch(WORKER_SESS,{method:'PATCH',
         headers:cabecalhos('sessions',{'Content-Type':'application/json'}),
         body:JSON.stringify({data:d})});
       alert('Sua sessão foi encerrada pelo administrador.');
       forcarSaida();
+      return;
     }
+    await renovarPresencaPortal(d);
   }catch(e){}
+}
+
+// Marca que esta pessoa continua usando o sistema, aproveitando a consulta que
+// ja acontece a cada 30 segundos. So grava quando a marca passa de 5 minutos:
+// gravar a cada 30s encheria o servidor de escrita a troco de nada.
+async function renovarPresencaPortal(d){
+  const AGORA=Date.now(), CADA=5*60*1000;
+  let precisaGravar=limparParadas(d);
+  const eu=(d.ativas||[]).find(s=>s.sessionId===_sessionId);
+  if(eu){
+    if(AGORA-(eu.ts||0)>CADA){ eu.ts=AGORA; precisaGravar=true; }
+  } else {
+    // Caiu da lista por ter ficado parado, mas voltou a usar: entra de novo, e
+    // este e um novo periodo de trabalho — o anterior ja foi fechado.
+    const nome=sessionStorage.getItem('portal-user')||'';
+    d.ativas=(d.ativas||[]).concat([{sessionId:_sessionId,
+      username:(sessionStorage.getItem('portal-admin-key')||nome).toLowerCase().trim(),
+      nome, sistema:'portal', ts:AGORA, inicio:AGORA}]);
+    precisaGravar=true;
+  }
+  if(!precisaGravar) return;
+  await fetch(WORKER_SESS,{method:'PATCH',
+    headers:cabecalhos('sessions',{'Content-Type':'application/json'}),
+    body:JSON.stringify({data:d})});
+}
+
+// Fecha uma sessao: tira das ativas e guarda quanto tempo durou. Serve para os
+// tres jeitos de acabar — clicou em Sair, foi deslogado pelo admin, ou parou de
+// dar sinal de vida.
+function encerrarNaLista(d, sessionId, motivo){
+  const i=(d.ativas||[]).findIndex(s=>s.sessionId===sessionId);
+  if(i<0) return false;
+  const s=d.ativas[i];
+  d.ativas.splice(i,1);
+  const inicio=s.inicio||s.ts||Date.now();
+  // Quem parou de dar sinal fecha na hora do ULTIMO sinal, nao agora: senao o
+  // tempo de uso contaria a hora em que a pessoa nem estava no computador.
+  const fim=(motivo==='parou')?(s.ts||inicio):Date.now();
+  d.encerradas=[{sessionId:s.sessionId, username:s.username||'', nome:s.nome||'',
+    sistema:s.sistema||'', inicio, fim,
+    minutos:Math.max(0,Math.round((fim-inicio)/60000)), motivo}]
+    .concat(d.encerradas||[]).slice(0,500);
+  return true;
+}
+
+// Quem ficou 1 hora sem sinal de vida nao esta mais operando. Qualquer pessoa
+// que esteja usando o sistema faz essa limpeza, porque quem fechou o navegador
+// nao tem como fechar a propria sessao.
+function limparParadas(d){
+  const LIMITE=60*60*1000, agora=Date.now();
+  let mexeu=false;
+  (d.ativas||[]).slice().forEach(s=>{
+    if(agora-(s.ts||0)>=LIMITE && encerrarNaLista(d,s.sessionId,'parou')) mexeu=true;
+  });
+  return mexeu;
+}
+
+// ---- MEUS LEMBRETES ----
+// Recado que a pessoa deixa para si mesma, com data. O sistema NÃO manda nada
+// sozinho: não existe servidor nosso ligado, as páginas só rodam enquanto
+// alguém está com elas abertas. O lembrete aparece quando a pessoa entra —
+// no dia marcado e em todos os dias seguintes, até ela dar como resolvido.
+//
+// Ficam num registro separado no banco, longe dos dados de compras e do
+// financeiro. Seguem a pessoa entre o computador e o celular.
+const SISTEMA_LEMBRETES='lembretes';
+let _lembretes=[];
+
+// O texto do lembrete é escrito pela pessoa e entra no HTML da lista. Sem
+// tratar, um "<" digitado quebraria a tela.
+function escTexto(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function meuLogin(){ return String(sessionStorage.getItem('portal-admin-key')||sessionStorage.getItem('portal-user')||'').toLowerCase().trim(); }
+function meusLembretes(){ return _lembretes.filter(function(l){ return String(l.user||'').toLowerCase()===meuLogin(); }); }
+function hojeISO(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+
+async function carregarLembretes(){
+  try{
+    const r=await fetch(WORKER_URL+'?t='+Date.now(),{cache:'no-store',headers:cabecalhos(SISTEMA_LEMBRETES)});
+    if(!r.ok) return;
+    const d=await r.json();
+    _lembretes=Array.isArray(d&&d.lembretes)?d.lembretes:[];
+  }catch(e){}
+  mostrarAvisoLembretes();
+  if(document.getElementById('lembretes-overlay').classList.contains('open')) renderLembretes();
+}
+
+// Grava relendo antes: duas pessoas podem estar mexendo nos seus lembretes ao
+// mesmo tempo, e cada uma só pode alterar os próprios.
+async function salvarLembretes(mudar){
+  let atual=[];
+  try{
+    const r=await fetch(WORKER_URL+'?t='+Date.now(),{cache:'no-store',headers:cabecalhos(SISTEMA_LEMBRETES)});
+    if(r.ok){ const d=await r.json(); atual=Array.isArray(d&&d.lembretes)?d.lembretes:[]; }
+  }catch(e){}
+  const eu=meuLogin();
+  const dosOutros=atual.filter(function(l){ return String(l.user||'').toLowerCase()!==eu; });
+  const meus=mudar(atual.filter(function(l){ return String(l.user||'').toLowerCase()===eu; }));
+  const novo=dosOutros.concat(meus);
+  const resp=await fetch(WORKER_URL,{method:'PATCH',
+    headers:cabecalhos(SISTEMA_LEMBRETES,{'Content-Type':'application/json'}),
+    body:JSON.stringify({data:{lembretes:novo}})});
+  if(!resp.ok){ alert('Não consegui salvar o lembrete.\n\nVerifique a internet e tente de novo.'); return false; }
+  _lembretes=novo;
+  mostrarAvisoLembretes();
+  renderLembretes();
+  return true;
+}
+
+// O que já venceu ou vence hoje, ainda não resolvido.
+function lembretesParaHoje(){
+  const h=hojeISO();
+  return meusLembretes().filter(function(l){ return !l.feito && String(l.data||'')<=h; })
+    .sort(function(a,b){ return String(a.data).localeCompare(String(b.data)); });
+}
+
+function mostrarAvisoLembretes(){
+  const el=document.getElementById('aviso-lembretes');
+  if(!el) return;
+  const lista=lembretesParaHoje();
+  const btn=document.getElementById('card-lembretes-conta');
+  if(btn) btn.textContent=lista.length?' ('+lista.length+')':'';
+  if(!lista.length){ el.style.display='none'; return; }
+  const h=hojeISO();
+  el.innerHTML='<strong>⏰ '+(lista.length===1?'Você tem 1 lembrete':'Você tem '+lista.length+' lembretes')+' para resolver</strong><br>'+
+    lista.slice(0,4).map(function(l){
+      const atrasado=String(l.data)<h;
+      return '<span style="display:block;margin-top:3px">'+(atrasado?'🔴':'🟡')+' '+
+        escTexto(l.texto)+' <span style="opacity:.75">· '+fmtData(l.data)+(atrasado?' (atrasado)':' (hoje)')+'</span></span>';
+    }).join('')+
+    (lista.length>4?'<span style="display:block;margin-top:3px;opacity:.75">e mais '+(lista.length-4)+'…</span>':'')+
+    '<span style="display:block;margin-top:6px;font-size:11.5px;text-decoration:underline">clique para abrir</span>';
+  el.style.display='block';
+}
+
+function fmtData(d){ if(!d) return '—'; const p=String(d).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+
+function openLembretes(){
+  document.getElementById('lembretes-overlay').classList.add('open');
+  document.getElementById('lem-texto').value='';
+  document.getElementById('lem-data').value=hojeISO();
+  renderLembretes();
+  carregarLembretes();
+}
+function closeLembretes(){ document.getElementById('lembretes-overlay').classList.remove('open'); }
+
+function renderLembretes(){
+  const el=document.getElementById('lem-lista');
+  if(!el) return;
+  const h=hojeISO();
+  const lista=meusLembretes().slice().sort(function(a,b){
+    if(!!a.feito!==!!b.feito) return a.feito?1:-1;          // pendentes primeiro
+    return String(a.data).localeCompare(String(b.data));
+  });
+  if(!lista.length){
+    el.innerHTML='<p style="font-size:13px;color:var(--gray-4);text-align:center;padding:14px">Nenhum lembrete. Escreva um acima.</p>';
+    return;
+  }
+  el.innerHTML=lista.map(function(l){
+    const atrasado=!l.feito && String(l.data||'')<h;
+    const hoje=!l.feito && String(l.data||'')===h;
+    const cor=l.feito?'var(--gray-4)':(atrasado?'#b02a37':(hoje?'#b9770e':'var(--gray-6)'));
+    return '<div style="display:flex;align-items:flex-start;gap:9px;padding:9px 11px;background:var(--gray-1);'+
+      'border:1px solid var(--gray-2);border-radius:8px;margin-bottom:6px">'+
+      '<input type="checkbox" '+(l.feito?'checked':'')+' onchange="marcarLembrete(\''+l.id+'\',this.checked)" style="width:auto;margin-top:2px;flex:none">'+
+      '<div style="flex:1">'+
+        '<div style="font-size:13px;color:'+cor+';'+(l.feito?'text-decoration:line-through':'font-weight:600')+'">'+escTexto(l.texto)+'</div>'+
+        '<div style="font-size:11px;color:var(--gray-4);margin-top:2px">'+fmtData(l.data)+
+          (l.feito?' · resolvido':(atrasado?' · atrasado':(hoje?' · é hoje':'')))+'</div>'+
+      '</div>'+
+      '<button class="btn btn-outline" style="padding:3px 9px;font-size:11px" onclick="excluirLembrete(\''+l.id+'\')">Excluir</button>'+
+    '</div>';
+  }).join('');
+}
+
+async function addLembrete(){
+  const texto=document.getElementById('lem-texto').value.trim();
+  const data=document.getElementById('lem-data').value;
+  if(!texto){ alert('Escreva o que você não quer esquecer.'); return; }
+  if(!data){ alert('Escolha a data em que quer ser lembrado.'); return; }
+  const novo={id:'lem-'+Math.random().toString(36).slice(2)+Date.now().toString(36),
+              user:meuLogin(), texto:texto, data:data, feito:false, criadoEm:new Date().toISOString()};
+
+  // Bilhete no celular, para quem quiser. Chega AGORA, não na data — o WhatsApp
+  // também não agenda. Serve como cópia no aparelho.
+  //
+  // A pergunta e a abertura da aba acontecem AQUI, antes de gravar. O navegador
+  // só deixa abrir aba nova como consequência direta do clique, e a espera da
+  // gravação quebra esse vínculo: a aba era bloqueada em silêncio. Por isso a
+  // aba é aberta em branco agora e só recebe o endereço depois que gravou.
+  const meu=numeroWhats((_avisaveis.filter(function(u){
+    return String(u.name||'').toLowerCase()===String(sessionStorage.getItem('portal-user')||'').toLowerCase();
+  })[0]||{}).whatsapp);
+  // Não abre aba nenhuma aqui. Quem atende é o aplicativo do WhatsApp, chamado
+  // direto depois de gravar — e aplicativo não depende de o clique estar
+  // "fresco", diferente de abrir aba.
+  const querCopia = !!meu && confirm('Quer mandar uma cópia deste lembrete para o seu WhatsApp agora?\n\n(A mensagem chega neste momento, não na data — o sistema mostra o lembrete no dia certo quando você entrar.)');
+
+  const ok=await salvarLembretes(function(meus){ return meus.concat([novo]); });
+  if(ok){
+    document.getElementById('lem-texto').value='';
+    document.getElementById('lem-data').value=hojeISO();
+    if(querCopia){
+      abrirWhats('https://api.whatsapp.com/send?phone='+meu+'&text='+encodeURIComponent(
+        'LEMBRETE — Daluminium\n\n'+texto+'\n\nPara: '+fmtData(data)));
+    }
+  }
+}
+
+async function marcarLembrete(id,feito){
+  await salvarLembretes(function(meus){
+    return meus.map(function(l){ return l.id===id?Object.assign({},l,{feito:!!feito}):l; });
+  });
+}
+async function excluirLembrete(id){
+  if(!confirm('Excluir este lembrete?')) return;
+  await salvarLembretes(function(meus){ return meus.filter(function(l){ return l.id!==id; }); });
+}
+
+// ---- RELATAR PROBLEMA PARA O ADMIN ----
+const RELATO_MODULO='Portal';
+
+// Guarda o último erro que o navegador registrou. É esta linha que diz onde
+// olhar quando o relato é "cliquei e não acontece nada".
+let _ultimoErro='';
+window.addEventListener('error',function(e){
+  const arq=e&&e.filename?String(e.filename).split('/').pop():'';
+  _ultimoErro=((e&&e.message)||'erro')+(arq?' ('+arq+':'+(e.lineno||'?')+')':'');
+});
+window.addEventListener('unhandledrejection',function(e){
+  const r=e&&e.reason;
+  _ultimoErro='falha em segundo plano: '+((r&&r.message)||r||'');
+});
+
+// A lista de usuários vem do registro do Compras de PRODUÇÃO — é o cadastro
+// único, o mesmo de onde o login sempre leu.
+let _avisaveis=[];
+async function carregarAvisaveis(){
+  try{
+    const r=await fetch(WORKER_URL+'?t='+Date.now(),{cache:'no-store',headers:cabecalhos('compras')});
+    if(!r.ok) return;
+    const d=await r.json();
+    const vistos={};
+    _avisaveis=[];
+    ((d&&d.usuarios)||[]).forEach(function(u){
+      if(u.active===false||!u.name||!u.whatsapp) return;
+      const k=String(u.name).toLowerCase().trim();
+      if(vistos[k]) return;
+      vistos[k]=1; _avisaveis.push({name:u.name,whatsapp:u.whatsapp,role:u.role||''});
+    });
+  }catch(e){}
+  try{ mostrarBotaoRelato(); }catch(e){}
+}
+
+function numeroDoAdmin(){
+  const porFuncao=_avisaveis.filter(function(u){ return String(u.role||'').toLowerCase()==='admin'; })[0];
+  if(porFuncao) return porFuncao.whatsapp;
+  const porNome=_avisaveis.filter(function(u){ return String(u.name||'').toLowerCase()==='admin'; })[0];
+  return porNome?porNome.whatsapp:'';
+}
+
+// Abre o WhatsApp. Se o navegador bloquear a aba — acontece quando o clique
+// ficou para tras por causa de uma espera, e em alguns navegadores acontece
+// sempre —, mostra um botao para a pessoa clicar. Assim a mensagem nunca fica
+// no vacuo: antes, quem apertava enviar nao via nada acontecer.
+// A aba do WhatsApp fecha sozinha quando a pessoa volta para o sistema. Sem
+// isso ela ficava aberta atras, e no fim do dia havia meia duzia delas.
+// Fecha so a que o proprio sistema abriu, e uma unica vez.
+var _abaWhats=null;
+function guardarAbaWhats(w){ if(w) _abaWhats=w; }
+function _voltouParaOSistema(){
+  if(!_abaWhats) return;
+  var w=_abaWhats; _abaWhats=null;
+  try{ if(!w.closed) w.close(); }catch(e){}
+}
+// Dois avisos, porque um so nao cobre os dois jeitos de usar: dentro do
+// portal o modulo roda numa moldura, e ai o "foco" vai para a pagina de fora,
+// nunca para ele. Ja a mudanca de visibilidade chega tambem na moldura.
+window.addEventListener("focus",_voltouParaOSistema);
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState==="visible") _voltouParaOSistema();
+});
+
+var _urlWhats="";
+// Abre a conversa no WhatsApp.
+//
+// Chama o APLICATIVO direto (whatsapp://), sem abrir pagina nenhuma. E o que
+// evita deixar uma aba do navegador para tras — antes sobrava uma aberta na
+// pagina do WhatsApp depois de cada mensagem, e ela so sumia quando a pessoa
+// voltava para o sistema.
+//
+// Se o aplicativo nao atender em pouco mais de um segundo (nao esta instalado,
+// ou a pessoa recusou), ai sim aparece um botao para abrir pelo navegador.
+function abrirWhats(url){
+  _urlWhats=url;
+  var doApp=String(url).replace("https://api.whatsapp.com/send?","whatsapp://send?");
+  var atendeu=false;
+  var aoSumir=function(){ if(document.visibilityState==="hidden") atendeu=true; };
+  document.addEventListener("visibilitychange",aoSumir);
+  window.addEventListener("blur",aoSumir);
+  setTimeout(function(){
+    document.removeEventListener("visibilitychange",aoSumir);
+    window.removeEventListener("blur",aoSumir);
+    if(atendeu) return;          // o aplicativo abriu: nada mais a fazer
+    mostrarBotaoWhats();
+  },1400);
+  try{ location.href=doApp; }catch(e){ mostrarBotaoWhats(); }
+}
+
+// Plano B: o aplicativo nao atendeu. Um botao para abrir a conversa pelo
+// navegador. Quem abre e o SISTEMA, no clique da pessoa — assim a aba fica
+// na nossa mao e fecha quando ela voltar.
+function mostrarBotaoWhats(){
+  var cx=document.getElementById("whats-fallback");
+  if(!cx){ cx=document.createElement("div"); cx.id="whats-fallback";
+    cx.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;"+
+      "display:flex;align-items:center;justify-content:center;padding:16px";
+    document.body.appendChild(cx); }
+  cx.innerHTML=
+    '<div style="background:#fff;border-radius:12px;padding:20px 22px;max-width:380px;text-align:center">'+
+    '<div style="font-size:14px;font-weight:700;margin-bottom:8px">Abrir o WhatsApp</div>'+
+    '<div style="font-size:12.5px;color:#555;line-height:1.5;margin-bottom:14px">A mensagem ja esta pronta. Clique para abrir a conversa.</div>'+
+    '<button type="button" onclick="abrirWhatsAgora()" style="background:#25D366;color:#fff;border:none;'+
+    'padding:10px 18px;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit">Abrir a conversa</button>'+
+    '<div style="margin-top:12px"><button type="button" style="background:none;border:none;color:#777;font-size:12px;cursor:pointer;font-family:inherit" '+
+    'onclick="var e=document.getElementById(&quot;whats-fallback&quot;); if(e) e.remove();">Agora nao</button></div>'+
+    '</div>';
+  cx.style.display="flex";
+}
+
+// Abre pelo navegador, no clique da pessoa, e guarda a aba para fecha-la
+// quando ela voltar.
+function abrirWhatsAgora(){
+  var cx=document.getElementById("whats-fallback"); if(cx) cx.remove();
+  var w=null;
+  try{ w=window.open(_urlWhats,"_blank"); }catch(e){}
+  if(w) guardarAbaWhats(w);
+  else location.href=_urlWhats;
+}
+
+function numeroWhats(n){
+  const so=String(n||'').replace(/\D/g,'');
+  if(!so) return '';
+  // Celular do Brasil tem 10 ou 11 dígitos com DDD. Menos que isso é engano.
+  if(so.length===10||so.length===11) return '55'+so;
+  if(so.length<12) return '';
+  return so;
+}
+
+let _relatoTela=null, _relatoArquivo=null, _relatoPng=null;
+
+function mostrarBotaoRelato(){
+  const b=document.getElementById('btn-relato');
+  if(!b) return;
+  const eu=sessionStorage.getItem('portal-user')||'';
+  b.style.display=(!soAdmin() && eu && numeroDoAdmin())?'inline-flex':'none';
+}
+
+function relatoOndeEstou(){
+  const frame=document.getElementById('frame-container');
+  if(frame && frame.classList.contains('active')){
+    return 'dentro do módulo '+((document.getElementById('frame-title')||{}).textContent||'—');
+  }
+  return 'escolha de módulos';
+}
+
+function abrirRelato(){
+  document.getElementById('rel-tipo').value='erro';
+  document.getElementById('rel-texto').value='';
+  document.getElementById('rel-arquivo').value='';
+  document.getElementById('rel-previa').innerHTML='';
+  _relatoTela=null;
+  document.getElementById('relato-overlay').classList.add('open');
+}
+function fecharRelato(){ document.getElementById('relato-overlay').classList.remove('open'); }
+
+// Print de celular passa fácil de 3 MB. Reduzir aqui é o que faz a cópia e o
+// compartilhamento funcionarem sem engasgar.
+function relatoEscolheuImagem(input){
+  const f=input.files&&input.files[0];
+  if(!f) return;
+  const img=new Image();
+  const url=URL.createObjectURL(f);
+  img.onload=function(){
+    const MAX=1400;
+    const esc=Math.min(1,MAX/Math.max(img.width,img.height));
+    const c=document.createElement('canvas');
+    c.width=Math.round(img.width*esc); c.height=Math.round(img.height*esc);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    _relatoTela=c;
+    // Prepara os arquivos JA, e nao na hora de enviar: o navegador so permite
+    // compartilhar ou abrir aba como consequencia direta do clique, e esperar
+    // a conversao da imagem no meio quebra esse vinculo.
+    c.toBlob(function(b){ if(b) _relatoArquivo=new File([b],'problema.jpg',{type:'image/jpeg'}); },'image/jpeg',0.85);
+    c.toBlob(function(b){ _relatoPng=b; },'image/png');
+    document.getElementById('rel-previa').innerHTML=
+      '<img src="'+c.toDataURL('image/jpeg',0.85)+'" style="max-width:100%;max-height:170px;border-radius:8px;border:1px solid var(--gray-2);display:block">'+
+      '<button type="button" class="btn btn-outline" style="margin-top:6px;font-size:11px;padding:4px 10px" onclick="relatoTirarImagem()">Remover imagem</button>';
+    URL.revokeObjectURL(url);
+  };
+  img.onerror=function(){ URL.revokeObjectURL(url); alert('Não consegui ler esta imagem. Tente outra.'); };
+  img.src=url;
+}
+function relatoTirarImagem(){
+  _relatoTela=null; _relatoArquivo=null; _relatoPng=null;
+  document.getElementById('rel-arquivo').value='';
+  document.getElementById('rel-previa').innerHTML='';
+}
+function relatoBlob(tela,tipo,qualidade){
+  return new Promise(function(ok){ tela.toBlob(ok,tipo,qualidade); });
+}
+
+async function enviarRelato(){
+  const texto=document.getElementById('rel-texto').value.trim();
+  if(!texto){ alert('Escreva o que aconteceu, nem que seja em poucas palavras.'); return; }
+  const num=numeroWhats(numeroDoAdmin());
+  if(!num){ alert('Não encontrei o WhatsApp do administrador no cadastro.'); return; }
+
+  const rotulo={erro:'ERRO NO SISTEMA',alteracao:'PEDIDO DE ALTERACAO',duvida:'DUVIDA'};
+  const tipo=document.getElementById('rel-tipo').value;
+  const msg=(rotulo[tipo]||tipo)+' — Daluminium\n\n'+
+    'Módulo: '+RELATO_MODULO+'\n'+
+    'Tela: '+relatoOndeEstou()+'\n'+
+    'De: '+(sessionStorage.getItem('portal-user')||'—')+'\n'+
+    'Quando: '+new Date().toLocaleString('pt-BR')+'\n\n'+
+    'Descrição:\n'+texto+
+    (_ultimoErro?'\n\n--- detalhe técnico ---\n'+_ultimoErro:'');
+
+  // Daqui para baixo nada de esperar: compartilhar e abrir aba so valem como
+  // consequencia direta do clique. Os arquivos ja ficaram prontos na hora de
+  // escolher a imagem, justamente por isso.
+  if(_relatoArquivo && navigator.canShare && navigator.canShare({files:[_relatoArquivo]})){
+    navigator.share({files:[_relatoArquivo],text:msg}).then(fecharRelato).catch(function(){});
+    return;
+  }
+  // Espera a copia terminar ANTES de chamar o WhatsApp. Chamar o aplicativo
+  // nao exige que o clique esteja "fresco", entao da para esperar — e sem
+  // esperar, a copia falhava as vezes: a pagina perdia o foco no meio.
+  let copiou=false;
+  if(_relatoPng){
+    try{ await navigator.clipboard.write([new ClipboardItem({'image/png':_relatoPng})]); copiou=true; }catch(e){}
+  }
+  abrirWhats('https://api.whatsapp.com/send?phone='+num+'&text='+encodeURIComponent(msg));
+  fecharRelato();
+  if(_relatoTela){
+    alert(copiou
+      ? 'A imagem ja esta copiada: dentro da conversa do WhatsApp, aperte Ctrl+V para colar antes de enviar.'
+      : 'Nao consegui copiar a imagem sozinho — anexe o print pela propria conversa do WhatsApp.');
+  }
+}
+
+// ---- TEMPO DE USO ----
+// Soma quanto cada pessoa passou dentro de cada modulo. As sessoes ainda
+// abertas entram com o tempo ate agora, senao o dia de hoje apareceria vazio
+// justamente para quem esta trabalhando.
+let _tempoUltimo=[];
+
+function openTempoUso(){
+  if(!soAdmin()){ alert('Acesso restrito ao administrador.'); return; }
+  document.getElementById('tempo-panel').style.display='block';
+  loadTempoUso();
+}
+
+async function loadTempoUso(){
+  const alvo=document.getElementById('tempo-lista');
+  alvo.innerHTML='<p style="font-size:13px;color:var(--gray-4);text-align:center">Carregando...</p>';
+  try{
+    const r=await fetch(WORKER_SESS,{headers:cabecalhos('sessions')});
+    if(!r.ok){ alvo.innerHTML='<p style="font-size:13px;color:var(--red);text-align:center">Erro ao carregar.</p>'; return; }
+    const d=await r.json();
+    const periodo=document.getElementById('tempo-periodo').value;
+    let desde=0;
+    if(periodo==='hoje'){ const h=new Date(); h.setHours(0,0,0,0); desde=h.getTime(); }
+    else if(periodo==='7')  desde=Date.now()-7*24*60*60*1000;
+    else if(periodo==='30') desde=Date.now()-30*24*60*60*1000;
+
+    const agora=Date.now();
+    const periodos=[]
+      .concat((d.encerradas||[]).map(s=>({nome:s.nome,sistema:s.sistema,inicio:s.inicio,fim:s.fim,
+        minutos:s.minutos,motivo:s.motivo,aberta:false})))
+      .concat((d.ativas||[]).map(s=>({nome:s.nome,sistema:s.sistema,inicio:s.inicio||s.ts,fim:agora,
+        minutos:Math.round((agora-(s.inicio||s.ts))/60000),motivo:'em andamento',aberta:true})))
+      .filter(p=>p.inicio>=desde);
+
+    _tempoUltimo=periodos;
+    if(!periodos.length){
+      alvo.innerHTML='<p style="font-size:13px;color:var(--gray-4);text-align:center">Nada registrado neste período.</p>';
+      return;
+    }
+
+    const rot={compras:'🛒 Compras',financeiro:'💰 Financeiro',portal:'🏠 Portal',fabrica:'🏭 Fábrica'};
+    // Agrupa por pessoa, e dentro dela por modulo.
+    const porPessoa={};
+    periodos.forEach(p=>{
+      const n=p.nome||'—';
+      (porPessoa[n]=porPessoa[n]||{total:0,modulos:{},periodos:[]});
+      porPessoa[n].total+=p.minutos;
+      porPessoa[n].modulos[p.sistema]=(porPessoa[n].modulos[p.sistema]||0)+p.minutos;
+      porPessoa[n].periodos.push(p);
+    });
+    const nomes=Object.keys(porPessoa).sort((a,b)=>porPessoa[b].total-porPessoa[a].total);
+    const hora=t=>new Date(t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    const dia=t=>new Date(t).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+
+    alvo.innerHTML=nomes.map(n=>{
+      const p=porPessoa[n];
+      const mods=Object.keys(p.modulos).sort((a,b)=>p.modulos[b]-p.modulos[a])
+        .map(m=>`<span style="font-size:11px;background:var(--gray-1);border:1px solid var(--gray-2);border-radius:20px;padding:2px 9px">${rot[m]||m} ${duracaoTexto(p.modulos[m])}</span>`).join(' ');
+      const linhas=p.periodos.sort((a,b)=>b.inicio-a.inicio).map(x=>
+        `<div style="font-size:11px;color:var(--gray-4);padding:2px 0">
+           ${dia(x.inicio)} · ${hora(x.inicio)} → ${x.aberta?'agora':hora(x.fim)} ·
+           ${rot[x.sistema]||x.sistema} · <strong>${duracaoTexto(x.minutos)}</strong>
+           ${x.aberta?'<span style="color:#1A7A45">• em andamento</span>':(x.motivo==='parou'?'<span style="color:#B9770E">• parou de usar</span>':(x.motivo==='deslogado'?'<span style="color:var(--red)">• deslogado</span>':''))}
+         </div>`).join('');
+      return `<div style="padding:10px 12px;background:var(--gray-1);border-radius:8px;border:1px solid var(--gray-2);margin-bottom:8px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div style="font-weight:700;font-size:13px">${n}</div>
+          <div style="font-size:14px;font-weight:800;color:var(--verde,#1A7A45)">${duracaoTexto(p.total)}</div>
+        </div>
+        <div style="margin:6px 0;display:flex;gap:5px;flex-wrap:wrap">${mods}</div>
+        <details><summary style="font-size:11px;color:var(--gray-4);cursor:pointer">ver os ${p.periodos.length} período(s)</summary>${linhas}</details>
+      </div>`;
+    }).join('')+
+    `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gray-2);font-size:11px;color:var(--gray-4);text-align:right">
+       ${periodos.length} período(s) · guarda os 500 mais recentes
+     </div>`;
+  }catch(e){
+    alvo.innerHTML='<p style="font-size:13px;color:var(--red);text-align:center">Erro ao carregar.</p>';
+  }
+}
+
+function exportTempoUso(){
+  if(!_tempoUltimo.length){ alert('Nada para exportar neste período.'); return; }
+  const aspas=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const linhas=[['Usuário','Módulo','Início','Fim','Minutos','Situação'].map(aspas).join(';')];
+  _tempoUltimo.slice().sort((a,b)=>b.inicio-a.inicio).forEach(p=>{
+    linhas.push([p.nome,p.sistema,new Date(p.inicio).toLocaleString('pt-BR'),
+      p.aberta?'(em andamento)':new Date(p.fim).toLocaleString('pt-BR'),
+      p.minutos,p.motivo].map(aspas).join(';'));
+  });
+  const blob=new Blob(['﻿'+linhas.join('\r\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='tempo_de_uso_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+// "3h12" em vez de "192 minutos".
+function duracaoTexto(minutos){
+  const m=Math.max(0,Math.round(minutos||0));
+  if(m<1) return 'menos de 1 min';
+  if(m<60) return m+' min';
+  const h=Math.floor(m/60), r=m%60;
+  return h+'h'+(r?String(r).padStart(2,'0'):'');
 }
 function startSessionCheckPortal(){
   if(_sessCheck) return;
@@ -1216,6 +1905,8 @@ function voltarPortal(){
   // volta a constar como "no portal" na lista de sessoes
   const nome=sessionStorage.getItem('portal-user')||'';
   if(nome) registrarSessaoPortal(nome, sessionStorage.getItem('portal-admin-key')||nome);
+  carregarAvisaveis();   // quem pode receber relato
+  carregarLembretes();   // o que ficou marcado para hoje
 }
 function abrirModulo(url,titulo){
   document.getElementById('portal').style.display='none';
