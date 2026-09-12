@@ -42,12 +42,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn-sair{background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.25);padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;transition:background .15s}
 .btn-sair:hover{background:rgba(255,255,255,.25)}
 
-.portal-main{max-width:900px;margin:0 auto;padding:3rem 1rem}
+/* 1080px em vez de 900: com 900 cabiam tres cartoes de modulo e o quarto
+   caia sozinho numa linha, o que ficava torto. */
+.portal-main{max-width:1080px;margin:0 auto;padding:3rem 1rem}
 .portal-greeting{text-align:center;margin-bottom:3rem}
 .portal-greeting h1{font-size:26px;font-weight:700;color:var(--gray-6);margin-bottom:6px}
 .portal-greeting p{font-size:14px;color:var(--gray-4)}
 
-.modulos{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;justify-content:center}
+/* auto-fit continua quebrando sozinho em tela estreita. O 215px e o gap menor
+   sao o que faz os quatro caberem lado a lado no computador, sem encolher o
+   cartao em relacao ao que era antes. */
+.modulos{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:16px;justify-content:center}
+/* No celular, um cartao por linha. Sem isto, o minmax de 215px punha dois
+   lado a lado numa tela de 480px e os dois ficavam apertados. */
+@media(max-width:600px){ .modulos{grid-template-columns:1fr} }
 .modulo-card{background:white;border-radius:14px;padding:2rem;box-shadow:var(--shadow);cursor:pointer;transition:all .2s;text-decoration:none;color:inherit;display:flex;flex-direction:column;align-items:center;text-align:center;border:2px solid transparent;position:relative;overflow:hidden}
 .modulo-card:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,0.12)}
 .modulo-card.compras{border-top:4px solid var(--teal-dark)}
@@ -55,6 +63,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .modulo-card.financeiro{border-top:4px solid var(--purple)}
 .modulo-card.financeiro:hover{border-color:var(--purple)}
 .modulo-card.fabrica{border-top:4px solid var(--amber)}
+.modulo-card.obra{border-top:4px solid var(--green)}
+.modulo-card.obra:hover{border-color:var(--green)}
 .modulo-card.fabrica:hover{border-color:var(--amber)}
 .modulo-icon{font-size:52px;margin-bottom:1rem}
 .modulo-title{font-size:18px;font-weight:700;margin-bottom:6px}
@@ -63,6 +73,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .badge-compras{background:var(--teal-light);color:var(--teal-dark)}
 .badge-financeiro{background:var(--purple-light);color:var(--purple)}
 .badge-fabrica{background:var(--amber-light);color:var(--amber)}
+.badge-obra{background:var(--green-light);color:var(--green)}
 .modulo-arrow{margin-top:1.5rem;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
 .modulo-card.compras .modulo-arrow{color:var(--teal-dark)}
 .modulo-card.financeiro .modulo-arrow{color:var(--purple)}
@@ -381,6 +392,7 @@ font-size:11.5px;padding:10px 12px;border-radius:6px;margin:8px 0;line-height:1.
               <label><input type="checkbox" id="nu-mod-compras" checked> 🛒 Gestão de Compras</label>
               <label><input type="checkbox" id="nu-mod-financeiro"> 💰 Financeiro</label>
               <label><input type="checkbox" id="nu-mod-fabrica"> 🏭 Fábrica</label>
+              <label><input type="checkbox" id="nu-mod-obra"> 📋 Gerenciamento de Obra</label>
             </div>
           </div>
         </div>
@@ -842,8 +854,8 @@ function showPortal(nome, modulos, isAdmin){
   renderModulos(modulos);
   // 1 módulo e não admin — entra direto
   if(modulos.length===1&&!isAdmin){
-    const URLS={compras:'https://daluminium.github.io/gestaodecompras/',financeiro:'https://daluminium.github.io/financeiro/',fabrica:'https://daluminium.github.io/fabrica/'};
-    const TITULOS={compras:'Gestão de Compras',financeiro:'Financeiro',fabrica:'Fábrica'};
+    const URLS={compras:'https://daluminium.github.io/gestaodecompras/',financeiro:'https://daluminium.github.io/financeiro/',fabrica:'https://daluminium.github.io/fabrica/',obra:'https://daluminium.github.io/obra/'};
+    const TITULOS={compras:'Gestão de Compras',financeiro:'Financeiro',fabrica:'Fábrica',obra:'Gerenciamento de Obra'};
     const m=modulos[0];
     if(URLS[m]){ document.getElementById('portal').style.display='none'; abrirModulo(URLS[m],TITULOS[m]); }
   }
@@ -854,9 +866,20 @@ function renderModulos(modulos){
   const MODULOS={
     compras:{icon:'🛒',title:'Gestão de Compras',desc:'Orçamentos, fornecedores, manutenção e controle de entregas das obras',url:'https://daluminium.github.io/gestaodecompras/',cls:'compras',badge:'badge-compras',badgeText:'Compras'},
     financeiro:{icon:'💰',title:'Financeiro',desc:'Contas a pagar, contas a receber, fluxo de caixa e relatórios',url:'https://daluminium.github.io/financeiro/',cls:'financeiro',badge:'badge-financeiro',badgeText:'Financeiro'},
-    fabrica:{icon:'🏭',title:'Fábrica',desc:'Acompanhamento das obras da conferência técnica até a entrega ao cliente',url:'https://daluminium.github.io/fabrica/',cls:'fabrica',badge:'badge-fabrica',badgeText:'Fábrica'}
+    fabrica:{icon:'🏭',title:'Fábrica',desc:'Acompanhamento das obras da conferência técnica até a entrega ao cliente',url:'https://daluminium.github.io/fabrica/',cls:'fabrica',badge:'badge-fabrica',badgeText:'Fábrica'},
+    obra:{icon:'📋',title:'Gerenciamento de Obra',desc:'A carteira de contratos: status, prazos, medição, entrega e anexos de cada obra',url:'https://daluminium.github.io/obra/',cls:'obra',badge:'badge-obra',badgeText:'Obra'}
   };
-  container.innerHTML=modulos.map(m=>{
+  // A ordem dos cartoes e a ordem do TRABALHO, nao a ordem em que os modulos
+  // aparecem no cadastro do usuario: tudo comeca no Gerenciamento de Obra,
+  // depois passa pelo Financeiro e pelo Compras, e termina na Fabrica.
+  //
+  // Modulo que nao esteja nesta lista vai para o FIM, em vez de sumir: um dia
+  // havera um modulo novo, e ele nao pode desaparecer da tela so por nao ter
+  // sido acrescentado aqui.
+  const ORDEM=['obra','financeiro','compras','fabrica'];
+  const pos=function(m){ const i=ORDEM.indexOf(m); return i<0?ORDEM.length:i; };
+  const naOrdem=modulos.slice().sort(function(a,b){ return pos(a)-pos(b); });
+  container.innerHTML=naOrdem.map(m=>{
     const mod=MODULOS[m];
     if(!mod) return '';
     return`<div class="modulo-card ${mod.cls}" onclick="abrirModulo('${mod.url}','${mod.title}')">
@@ -1067,6 +1090,7 @@ async function addUsuario(){
   if(document.getElementById('nu-mod-compras').checked) modulos.push('compras');
   if(document.getElementById('nu-mod-financeiro').checked) modulos.push('financeiro');
   if(document.getElementById('nu-mod-fabrica').checked) modulos.push('fabrica');
+  if(document.getElementById('nu-mod-obra').checked) modulos.push('obra');
   if(!name||!username||!pass){ alert('Preencha nome, usuário e senha.'); return; }
   if(ADMINS.find(a=>a.user===username)){ alert('Usuário reservado para administradores.'); return; }
   if(portalData.usuarios.find(u=>u.username===username)){ alert('Usuário já cadastrado.'); return; }
@@ -1093,6 +1117,7 @@ async function addUsuario(){
   document.getElementById('nu-mod-compras').checked=true;
   document.getElementById('nu-mod-financeiro').checked=false;
   document.getElementById('nu-mod-fabrica').checked=false;
+  document.getElementById('nu-mod-obra').checked=false;
   renderUserList();
   alert('Usuário cadastrado e salvo! ✅');
 }
@@ -1114,13 +1139,13 @@ async function editUsuario(idx){
     alert('Função inválida: "'+novoRole+'".\n\nVocê pode usar: '+opcoes+'.');
     return;
   }
-  const novosMods=prompt('Módulos (compras,financeiro):' ,(u.modulos||['compras']).join(',')); if(novosMods===null) return;
+  const novosMods=prompt('Módulos (obra, financeiro, compras, fabrica):' ,(u.modulos||['compras']).join(',')); if(novosMods===null) return;
   const novoZap=prompt('WhatsApp (só números, em branco para não avisar):',u.whatsapp||''); if(novoZap===null) return;
   const novaSenha=prompt('Nova senha (deixe em branco para manter):','');
   portalData.usuarios[idx].name=novoNome.trim()||u.name;
   portalData.usuarios[idx].whatsapp=String(novoZap).replace(/\D/g,'');
   portalData.usuarios[idx].role=novoRole.trim();
-  portalData.usuarios[idx].modulos=novosMods.split(',').map(m=>m.trim()).filter(m=>['compras','financeiro','fabrica'].includes(m));
+  portalData.usuarios[idx].modulos=novosMods.split(',').map(m=>m.trim()).filter(m=>['compras','financeiro','fabrica','obra'].includes(m));
   if(novaSenha&&novaSenha.trim().length>=6){ portalData.usuarios[idx].password=await sha256(novaSenha.trim()); portalData.usuarios[idx].tempPass=false; }
   await savePortalData();
   renderUserList();
@@ -1229,7 +1254,7 @@ async function loadSessoes(){
       return;
     }
     ativas.sort((a,b)=>b.ts-a.ts);
-    const sistemaLabel={compras:'🛒 Gestão de Compras',financeiro:'💰 Financeiro',portal:'🏠 Portal',fabrica:'🏭 Fábrica'};
+    const sistemaLabel={compras:'🛒 Gestão de Compras',financeiro:'💰 Financeiro',portal:'🏠 Portal',fabrica:'🏭 Fábrica',obra:'📋 Gerenciamento de Obra'};
     lista.innerHTML=ativas.map(s=>{
       const minutos=Math.floor((Date.now()-s.ts)/60000);
       // O sinal de vida chega a cada 5 minutos, entao ate 10 minutos e "agora".
@@ -1812,7 +1837,7 @@ async function loadTempoUso(){
       return;
     }
 
-    const rot={compras:'🛒 Compras',financeiro:'💰 Financeiro',portal:'🏠 Portal',fabrica:'🏭 Fábrica'};
+    const rot={compras:'🛒 Compras',financeiro:'💰 Financeiro',portal:'🏠 Portal',fabrica:'🏭 Fábrica',obra:'📋 Obra'};
     // Agrupa por pessoa, e dentro dela por modulo.
     const porPessoa={};
     periodos.forEach(p=>{
