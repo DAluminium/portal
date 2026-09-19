@@ -585,7 +585,11 @@ FROM app_backups ORDER BY created_at DESC LIMIT 20;</code>
 // ---- CONFIG ----
 const WORKER_URL = 'https://daluminium-api.daluminium2.workers.dev';
 const ADMINS = []; // admins agora vivem na lista de usuarios do banco
-const MAX_TENT=5, BLOQ_MS=5*60*1000;
+// 15 minutos, o MESMO tempo da trava do Worker (auditoria de LGPD,
+// 18/09/2026). Esta aqui fica no navegador e se contorna trocando de
+// navegador; serve para avisar "X tentativas restantes". A que protege e a do
+// Worker, que conta no servidor.
+const MAX_TENT=5, BLOQ_MS=15*60*1000;
 
 // ---- CRACHÁ (login pelo Worker) ----
 // O crachá tem duas partes separadas por ponto: os dados (quem é, até quando
@@ -693,7 +697,12 @@ function addFalha(){
   t.t=now; setTent(t);
   return MAX_TENT-t.c;
 }
-function getAdminPass(u){ return(JSON.parse(localStorage.getItem('portal-admin-passes')||'{}')||{})[u]||null; }
+// Aqui existia getAdminPass: lia o resumo da senha do admin guardado neste
+// navegador. Nada a chamava mais — o login passou para o Worker. Saiu na
+// auditoria de LGPD de 18/09/2026, junto com trocarSenhaAdmin, a unica que
+// gravava esse resumo. O que tiver ficado guardado em algum computador e
+// apagado logo abaixo, ao abrir o portal.
+try{ localStorage.removeItem('portal-admin-passes'); }catch(e){}
 
 // ---- DADOS PORTAL (usuários unificados) ----
 let portalData={usuarios:[]};
@@ -855,9 +864,13 @@ async function doLogin(){
     cracha=await fazerLoginWorker(user,pass);
   }catch(e){
     btn.textContent='Entrar'; btn.disabled=false;
-    if(e.status===401){
+    // Bloqueado pelo Worker por excesso de senhas erradas (auditoria de LGPD,
+    // 18/09/2026). A mensagem dele ja diz quantos minutos faltam.
+    if(e.status===429){
+      err.textContent=e.message;
+    }else if(e.status===401){
       const r=addFalha();
-      err.textContent=r>0?`Usuário ou senha incorretos. ${r} tentativa${r>1?'s':''} restante${r>1?'s':''}.`:'Acesso bloqueado por 5 minutos.';
+      err.textContent=r>0?`Usuário ou senha incorretos. ${r} tentativa${r>1?'s':''} restante${r>1?'s':''}.`:'Acesso bloqueado por 15 minutos.';
     }else{
       // Erro de conexão não é senha errada — não pode gastar tentativa, senão
       // uma queda de internet acaba bloqueando quem digitou tudo certo.
@@ -1358,13 +1371,6 @@ function changeMyPass(){
   });
 }
 
-function trocarSenhaAdmin(admin){
-  const nova=prompt(`Bem-vinda(o), ${admin.name}!\n\nSenha temporária detectada.\nDigite sua nova senha (mínimo 6 caracteres):`,'');
-  if(!nova||nova.trim().length<6){ alert('Senha não alterada. Será solicitada no próximo login.'); return; }
-  if(prompt('Confirme:','')!==nova.trim()){ alert('Senhas não coincidem.'); return; }
-  const saved=JSON.parse(localStorage.getItem('portal-admin-passes')||'{}');
-  sha256(nova.trim()).then(h=>{ saved[admin.user]=h; localStorage.setItem('portal-admin-passes',JSON.stringify(saved)); alert('Senha alterada! ✅'); });
-}
 
 function trocarSenhaUser(found){
   const nova=prompt(`Bem-vindo(a), ${found.name}!\n\nSenha temporária detectada.\nDigite sua nova senha (mínimo 6 caracteres):`,'');
