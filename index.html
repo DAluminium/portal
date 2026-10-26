@@ -81,6 +81,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .modulo-card.crm:hover{border-color:#1F5FA8}
 .modulo-card.crm .modulo-arrow{color:#1F5FA8}
 .badge-crm{background:#E8F1FB;color:#1F5FA8}
+.modulo-card.acompanhamento{border-top:4px solid #C2255C}
+.modulo-card.acompanhamento:hover{border-color:#C2255C}
+.modulo-card.acompanhamento .modulo-arrow{color:#C2255C}
+.badge-acompanhamento{background:#FCE8EF;color:#A61E4D}
+/* "Acompanhamento" e uma palavra so e nao quebra: com 18px ela passava 9px da
+   largura do cartao quando os seis ficam na mesma fileira. */
+.modulo-card.acompanhamento .modulo-title{font-size:16.5px}
 .modulo-arrow{margin-top:1.5rem;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
 .modulo-card.compras .modulo-arrow{color:var(--teal-dark)}
 .modulo-card.financeiro .modulo-arrow{color:var(--purple)}
@@ -517,6 +524,7 @@ font-size:11.5px;padding:10px 12px;border-radius:6px;margin:8px 0;line-height:1.
               <label><input type="checkbox" id="nu-mod-fabrica"> 🏭 Fábrica</label>
               <label><input type="checkbox" id="nu-mod-obra"> 📋 Gerenciamento de Obra</label>
               <label><input type="checkbox" id="nu-mod-crm"> 🤝 CRM Comercial</label>
+              <label><input type="checkbox" id="nu-mod-acompanhamento"> 📐 Acompanhamento</label>
               <label data-so-admin title="Mesmo sendo funcionário, tira anexos de qualquer pessoa no Compras (os lançamentos continuam só com o gerente)"><input type="checkbox" id="nu-anexos-compras"> 🗑 Compras: tira anexo de qualquer pessoa</label>
               <label title="A pessoa abre a Fábrica para consultar a etapa dos projetos, mas não altera nada"><input type="checkbox" id="nu-ver-fabrica" onchange="if(this.checked) document.getElementById('nu-mod-fabrica').checked=true"> 👁️ Fábrica só para consultar</label>
             </div>
@@ -559,6 +567,7 @@ font-size:11.5px;padding:10px 12px;border-radius:6px;margin:8px 0;line-height:1.
             <label><input type="checkbox" id="eu-mod-fabrica"> 🏭 Fábrica</label>
             <label><input type="checkbox" id="eu-mod-obra"> 📋 Gerenciamento de Obra</label>
             <label><input type="checkbox" id="eu-mod-crm"> 🤝 CRM Comercial</label>
+            <label><input type="checkbox" id="eu-mod-acompanhamento"> 📐 Acompanhamento</label>
             <label data-so-admin title="Mesmo sendo funcionário, tira anexos de qualquer pessoa no Compras (os lançamentos continuam só com o gerente)"><input type="checkbox" id="eu-anexos-compras"> 🗑 Compras: tira anexo de qualquer pessoa</label>
             <label title="A pessoa abre a Fábrica para consultar a etapa dos projetos, mas não altera nada"><input type="checkbox" id="eu-ver-fabrica" onchange="if(this.checked) document.getElementById('eu-mod-fabrica').checked=true"> 👁️ Fábrica só para consultar</label>
           </div>
@@ -820,7 +829,7 @@ function loginGuardaApagar(chave){
 // Preferencias de tela (aba escolhida, ordem da carteira, ultima empresa do
 // comprovante) ficam: nao sao dado de ninguem.
 const DADOS_LOCAIS=['dalum-data','fin-data','dalum-fabrica','dalum-obra','dalum-crm','dalum-crm-para-obra','dalum-crm-abrir',
-  'portal-admin-passes','dalum-admin-passes','fin-admin-passes'];
+  'portal-admin-passes','dalum-admin-passes','fin-admin-passes','dalum-acomp','dalum-acomp-obras'];
 function apagarDadosLocais(){
   DADOS_LOCAIS.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
 }
@@ -905,19 +914,30 @@ function pedirCodigoNoCartao(errado){
     let foi=false;
     function entregar(v){
       if(foi) return; foi=true;
-      inp.oninput=null; inp.onkeydown=null;
+      inp.oninput=null; inp.onkeydown=null; inp.onkeyup=null; inp.onchange=null;
       if(v){ inp.disabled=true; dica.style.color='#5A6370'; dica.textContent='Conferindo...'; }
       else cx.style.display='none';
       resolver(v);
     }
-    inp.oninput=function(){ const d=inp.value.replace(/\D/g,''); if(d.length===6) entregar(d); };
-    inp.onkeydown=function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); const d=inp.value.replace(/\D/g,''); if(d.length===6) entregar(d); } };
+    // Entra sozinho ao completar os 6 numeros (pedido do Ander: sem botao).
+    // Varios jeitos de perceber, porque cada teclado de celular avisa de um
+    // jeito: ao digitar, ao soltar a tecla, ao sair do campo e no Enter.
+    const conferir=function(){ const d=inp.value.replace(/\D/g,''); if(d.length===6) entregar(d); };
+    inp.oninput=conferir; inp.onkeyup=conferir; inp.onchange=conferir;
+    inp.onkeydown=function(ev){ if(ev.key==='Enter'||ev.keyCode===13){ ev.preventDefault(); conferir(); } };
     document.getElementById('login-codigo-cancelar').onclick=function(ev){ ev.preventDefault(); entregar(''); };
   });
 }
 
 async function fazerLoginWorker(user,senha,codigo){
-  const r=await fetch(WORKER_URL,{
+  // Tempo maximo de espera (21/10/2026): sem isto, uma resposta que nao
+  // chegava (internet do celular caindo) deixava "Verificando..." para sempre.
+  const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
+  const relogio=ctl?setTimeout(function(){ ctl.abort(); },25000):null;
+  let r;
+  try{
+  r=await fetch(WORKER_URL,{
+    signal:ctl?ctl.signal:undefined,
     method:'POST',
     cache:'no-store',
     // X-Sistema so diz ao Worker o AMBIENTE, para o caderno de acessos anotar
@@ -927,6 +947,10 @@ async function fazerLoginWorker(user,senha,codigo){
       'X-Sistema':ambienteDeTeste()?'compras_teste':'compras'},
     body:JSON.stringify({usuario:user,senha:senha,codigo:codigo||''})
   });
+  }catch(e){
+    if(e&&e.name==='AbortError') throw new Error('o servidor demorou mais de 25 segundos para responder; confira a internet do celular');
+    throw e;
+  }finally{ if(relogio) clearTimeout(relogio); }
   let j=null;
   try{ j=await r.json(); }catch(e){}
   // CODIGO DO AUTENTICADOR (admin, 10/10/2026): a senha estava certa e o
@@ -1054,8 +1078,10 @@ async function verificarSenha(digitada,armazenada){
   return digitada===armazenada;
 }
 function getTent(){ try{return JSON.parse(localStorage.getItem('portal-tries')||'{"c":0,"t":0}');}catch{return{c:0,t:0};} }
-function setTent(o){ localStorage.setItem('portal-tries',JSON.stringify(o)); }
-function resetTent(){ localStorage.removeItem('portal-tries'); }
+// Protegidas (21/10/2026): navegador de celular que recusa o armazenamento
+// fazia o login parar em "Verificando..." depois do codigo do autenticador.
+function setTent(o){ try{ localStorage.setItem('portal-tries',JSON.stringify(o)); }catch(e){} }
+function resetTent(){ try{ localStorage.removeItem('portal-tries'); }catch(e){} }
 function checkBloq(){
   const t=getTent();
   if(t.c>=MAX_TENT){
@@ -1214,6 +1240,7 @@ async function doLogin(){
     cracha=await fazerLoginWorker(user,pass);
   }catch(e){
     btn.textContent='Entrar'; btn.disabled=false;
+    { const cx=document.getElementById('login-codigo-cx'); if(cx) cx.style.display='none'; }
     // Bloqueado pelo Worker por excesso de senhas erradas (auditoria de LGPD,
     // 18/09/2026). A mensagem dele ja diz quantos minutos faltam.
     if(e.status===429){
@@ -1232,6 +1259,11 @@ async function doLogin(){
     return;
   }
 
+  // Daqui para baixo a senha (e o codigo) ja foram aceitos. Qualquer falha
+  // aparece escrita na tela (21/10/2026): antes, um erro aqui deixava o botao
+  // em "Verificando..." para sempre, sem dizer nada — foi o que aconteceu no
+  // celular do Ander.
+  try{
   resetTent();
   const isAdmin=(cracha.role==='admin');
   const modulos=cracha.modulos&&cracha.modulos.length?cracha.modulos:['compras'];
@@ -1261,6 +1293,12 @@ async function doLogin(){
   if(cracha.tempPass){
     const u=portalData.usuarios.find(x=>String(x.username||'').toLowerCase()===String(cracha.username||'').toLowerCase());
     if(u) setTimeout(()=>trocarSenhaUser(u),500);
+  }
+  }catch(e){
+    btn.textContent='Entrar'; btn.disabled=false;
+    err.textContent='A senha e o código foram aceitos, mas a tela parou ao abrir o portal ('+
+      ((e&&(e.name+': '+e.message))||e)+'). Mande um print desta mensagem para o suporte.';
+    err.style.display='block';
   }
 }
 
@@ -1403,8 +1441,8 @@ function showPortal(nome, modulos, isAdmin){
   renderModulos(modulos);
   // 1 módulo e não admin — entra direto
   if(modulos.length===1&&!isAdmin){
-    const URLS={compras:'https://daluminium.github.io/gestaodecompras/',financeiro:'https://daluminium.github.io/financeiro/',fabrica:'https://daluminium.github.io/fabrica/',obra:'https://daluminium.github.io/obra/',crm:'https://daluminium.github.io/crm/'};
-    const TITULOS={compras:'Gestão de Compras',financeiro:'Financeiro',fabrica:'Fábrica',obra:'Gerenciamento de Obra',crm:'CRM Comercial'};
+    const URLS={compras:'https://daluminium.github.io/gestaodecompras/',financeiro:'https://daluminium.github.io/financeiro/',fabrica:'https://daluminium.github.io/fabrica/',obra:'https://daluminium.github.io/obra/',crm:'https://daluminium.github.io/crm/',acompanhamento:'https://daluminium.github.io/acompanhamento/'};
+    const TITULOS={compras:'Gestão de Compras',financeiro:'Financeiro',fabrica:'Fábrica',obra:'Gerenciamento de Obra',crm:'CRM Comercial',acompanhamento:'Acompanhamento'};
     const m=modulos[0];
     if(URLS[m]){ document.getElementById('portal').style.display='none'; abrirModulo(URLS[m],TITULOS[m]); }
   }
@@ -1417,7 +1455,8 @@ function renderModulos(modulos){
     financeiro:{icon:'💰',title:'Financeiro',desc:'Contas a pagar, contas a receber, fluxo de caixa e relatórios',url:'https://daluminium.github.io/financeiro/',cls:'financeiro',badge:'badge-financeiro',badgeText:'Financeiro'},
     fabrica:{icon:'🏭',title:'Fábrica',desc:'Acompanhamento das obras da conferência técnica até a entrega ao cliente',url:'https://daluminium.github.io/fabrica/',cls:'fabrica',badge:'badge-fabrica',badgeText:'Fábrica'},
     obra:{icon:'📋',title:'Gerenciamento de Obra',desc:'A carteira de contratos: status, prazos, medição, entrega e anexos de cada obra',url:'https://daluminium.github.io/obra/',cls:'obra',badge:'badge-obra',badgeText:'Obra'},
-    crm:{icon:'🤝',title:'CRM Comercial',desc:'O funil de vendas: clientes em negociação, retornos combinados e negócios fechados',url:'https://daluminium.github.io/crm/',cls:'crm',badge:'badge-crm',badgeText:'CRM'}
+    crm:{icon:'🤝',title:'CRM Comercial',desc:'O funil de vendas: clientes em negociação, retornos combinados e negócios fechados',url:'https://daluminium.github.io/crm/',cls:'crm',badge:'badge-crm',badgeText:'CRM'},
+    acompanhamento:{icon:'📐',title:'Acompanhamento',desc:'Medição de vãos na obra: uma ficha por esquadria, do PDF do SmartCEM até a produção',url:'https://daluminium.github.io/acompanhamento/',cls:'acompanhamento',badge:'badge-acompanhamento',badgeText:'Medição'}
   };
   // A ordem dos cartoes e a ordem do TRABALHO, nao a ordem em que os modulos
   // aparecem no cadastro do usuario: tudo comeca no Gerenciamento de Obra,
@@ -1427,7 +1466,9 @@ function renderModulos(modulos){
   // havera um modulo novo, e ele nao pode desaparecer da tela so por nao ter
   // sido acrescentado aqui.
   // O CRM vem antes de tudo: e a venda que vira contrato na Obra (09/10/2026).
-  const ORDEM=['crm','obra','financeiro','compras','fabrica'];
+  // O Acompanhamento (21/10/2026) vem logo depois da Obra: a medicao do vao
+  // acontece depois do contrato e antes da producao.
+  const ORDEM=['crm','obra','acompanhamento','financeiro','compras','fabrica'];
   const pos=function(m){ const i=ORDEM.indexOf(m); return i<0?ORDEM.length:i; };
   const naOrdem=modulos.slice().sort(function(a,b){ return pos(a)-pos(b); });
   container.innerHTML=naOrdem.map(m=>{
@@ -2370,6 +2411,7 @@ async function addUsuario(){
   if(document.getElementById('nu-mod-fabrica').checked) modulos.push('fabrica');
   if(document.getElementById('nu-mod-obra').checked) modulos.push('obra');
   if(document.getElementById('nu-mod-crm').checked) modulos.push('crm');
+  if(document.getElementById('nu-mod-acompanhamento').checked) modulos.push('acompanhamento');
   if(!name||!username||!pass){ alert('Preencha nome, usuário e senha.'); return; }
   if(pass.length<6){ alert('A senha precisa de pelo menos 6 caracteres.'); return; }
   if(ADMINS.find(a=>a.user===username)){ alert('Usuário reservado para administradores.'); return; }
@@ -2415,6 +2457,7 @@ async function addUsuario(){
   document.getElementById('nu-mod-fabrica').checked=false;
   document.getElementById('nu-mod-obra').checked=false;
   document.getElementById('nu-mod-crm').checked=false;
+  document.getElementById('nu-mod-acompanhamento').checked=false;
   document.getElementById('nu-ver-fabrica').checked=false;
   document.getElementById('nu-anexos-compras').checked=false;
   renderUserList();
@@ -2423,7 +2466,7 @@ async function addUsuario(){
 
 // Qual usuário está aberto na janela de edição. Nulo = nenhuma.
 let _editandoUsuario=null;
-const MODULOS_DO_SISTEMA=['compras','financeiro','fabrica','obra','crm'];
+const MODULOS_DO_SISTEMA=['compras','financeiro','fabrica','obra','crm','acompanhamento'];
 
 function editUsuario(idx){
   const u=portalData.usuarios[idx];
