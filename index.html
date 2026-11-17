@@ -2178,8 +2178,12 @@ async function importarFornecedores() {
 // Worker, pela funcao veContrato. NAO cadastra contrato novo, e NAO mexe em
 // usuarios: o "nivel" aqui e so quem administra quem, e nisso ele fica junto
 // com os demais. O que o poe acima do Funcionario e o acesso ao contrato.
-const NIVEL={admin:3, gerente:2, tecnico:1, funcionario:1, compras:1, financeiro:1, consulta:1, vendedor:1, orcamentista:1};
-const ROTULO_PAPEL={gerente:'Gerente',tecnico:'Técnico',funcionario:'Funcionário',compras:'Compras',financeiro:'Financeiro',vendedor:'Vendedor',orcamentista:'Orçamentista',consulta:'Consulta (só olha)'};
+// coordenador (17/11/2026): quem vai a campo medir a obra. Faz tudo o que o
+// Funcionario faz e mais uma coisa: corrige a DATA DA MEDIÇÃO já registrada na
+// ficha da Obra, que o funcionario nao altera. Nao ve contrato, nao exclui e
+// nao mexe em usuarios — o "nivel" segue 1, como os demais.
+const NIVEL={admin:3, gerente:2, tecnico:1, coordenador:1, funcionario:1, compras:1, financeiro:1, consulta:1, vendedor:1, orcamentista:1};
+const ROTULO_PAPEL={gerente:'Gerente',tecnico:'Técnico',coordenador:'Coordenador',funcionario:'Funcionário',compras:'Compras',financeiro:'Financeiro',vendedor:'Vendedor',orcamentista:'Orçamentista',consulta:'Consulta (só olha)'};
 function nivelDe(role){ return NIVEL[String(role||'').toLowerCase()] || 1; }
 function meuNivel(){ return nivelDe(sessionStorage.getItem('portal-role')||''); }
 function meuUsuario(){ return String(sessionStorage.getItem('portal-admin-key')||'').toLowerCase(); }
@@ -2243,7 +2247,7 @@ function papeisQuePossoDar(){
   const meu=meuNivel();
   // A ordem aqui e a ordem do menu: o Tecnico vem logo depois do Gerente,
   // porque e o que ve o contrato.
-  return ['gerente','tecnico','funcionario','vendedor','orcamentista','consulta'].filter(function(r){ return nivelDe(r)<meu; });
+  return ['gerente','tecnico','coordenador','funcionario','vendedor','orcamentista','consulta'].filter(function(r){ return nivelDe(r)<meu; });
 }
 // Os modulos que EU posso dar (10/10/2026): o admin, todos; o gerente, so os
 // que ele mesmo tem. O Worker confere de novo ao gravar — aqui e so para a tela
